@@ -1,0 +1,307 @@
+use crate::plugin::action::{CharResponder, PluginAction, StrResponder};
+use crossbeam_channel::Sender;
+use mlua::{self, LuaSerdeExt};
+use parking_lot::{Condvar, Mutex};
+use triomphe::Arc;
+
+// editor.set.line
+fn set_line_at(
+    lua: &mlua::Lua,
+    tx: &Sender<PluginAction>,
+    insert_table: &mlua::Table,
+) -> Result<(), mlua::Error> {
+    let tx = tx.clone();
+    insert_table.set(
+        "line",
+        lua.create_function(move |_lua, (line, contents): (usize, String)| {
+            let _ = tx.send(PluginAction::SetLine {
+                line,
+                contents: contents,
+            });
+            Ok(())
+        })?,
+    )
+}
+
+// editor.set.str(from: Vec<usize>, to: Vec<usize>, txt: String)
+fn set_str_at(
+    lua: &mlua::Lua,
+    tx: &Sender<PluginAction>,
+    set_table: &mlua::Table,
+) -> Result<(), mlua::Error> {
+    let tx = tx.clone();
+    set_table.set(
+        "str",
+        lua.create_function(
+            move |_lua, (from, to, txt): (Vec<usize>, Vec<usize>, String)| {
+                let _ = tx.send(PluginAction::SetStrAt { from, to, txt: txt });
+                Ok(())
+            },
+        )?,
+    )
+}
+
+// editor.get.char(pos: Vec<usize>)
+fn get_char_at(
+    lua: &mlua::Lua,
+    tx: &Sender<PluginAction>,
+    get_table: &mlua::Table,
+) -> Result<(), mlua::Error> {
+    let responder = Arc::new(CharResponder {
+        c: Mutex::new(None),
+        signal: Condvar::new(),
+    });
+
+    let responder_clone = responder.clone();
+    let tx = tx.clone();
+    get_table.set(
+        "char",
+        lua.create_function(move |lua, pos: Vec<usize>| {
+            let _ = tx.send(PluginAction::GetCharAt {
+                pos,
+                responder: responder_clone.clone(),
+            });
+            let mut lock = responder_clone.c.lock();
+            if lock.is_none() {
+                responder_clone.signal.wait(&mut lock);
+            }
+
+            let info = lock.clone();
+            if info.is_some() {
+                lua.to_value(&info.unwrap())
+            } else {
+                lua.to_value(&mlua::Nil)
+            }
+        })?,
+    )
+}
+
+// editor.get.str(from: Vec<usize>, to: Vec<usize>)
+fn get_str_at(
+    lua: &mlua::Lua,
+    tx: &Sender<PluginAction>,
+    get_table: &mlua::Table,
+) -> Result<(), mlua::Error> {
+    let responder = Arc::new(StrResponder {
+        string: Mutex::new(None),
+        signal: Condvar::new(),
+    });
+
+    let responder_clone = responder.clone();
+    let tx = tx.clone();
+
+    get_table.set(
+        "str",
+        lua.create_function(move |lua, (from, to): (Vec<usize>, Vec<usize>)| {
+            let _ = tx.send(PluginAction::GetStrAt {
+                from,
+                to,
+                responder: responder_clone.clone(),
+            });
+            let mut lock = responder_clone.string.lock();
+            if lock.is_none() {
+                responder_clone.signal.wait(&mut lock);
+            }
+
+            let info = lock.clone();
+            if info.is_some() {
+                lua.to_value(&info.unwrap().to_string())
+            } else {
+                lua.to_value(&mlua::Nil)
+            }
+        })?,
+    )
+}
+
+// editor.get.line(line: usize)
+fn get_line(
+    lua: &mlua::Lua,
+    tx: &crossbeam_channel::Sender<PluginAction>,
+    get_table: &mlua::Table,
+) -> Result<(), mlua::Error> {
+    let responder = Arc::new(StrResponder {
+        string: Mutex::new(None),
+        signal: Condvar::new(),
+    });
+
+    let responder_clone = responder.clone();
+    let tx = tx.clone();
+
+    get_table.set(
+        "line",
+        lua.create_function(move |lua, line: usize| {
+            let _ = tx.send(PluginAction::GetLine {
+                line,
+                responder: responder_clone.clone(),
+            });
+            let mut lock = responder_clone.string.lock();
+            if lock.is_none() {
+                responder_clone.signal.wait(&mut lock);
+            }
+
+            let info = lock.clone();
+            if info.is_some() {
+                lua.to_value(&info.unwrap().to_string())
+            } else {
+                lua.to_value(&mlua::Nil)
+            }
+        })?,
+    )
+}
+
+// editor.set.char(pos: Vec<usize>, c: char)
+fn set_char_at(
+    lua: &mlua::Lua,
+    tx: &Sender<PluginAction>,
+    set_table: &mlua::Table,
+) -> Result<(), mlua::Error> {
+    let tx = tx.clone();
+    set_table.set(
+        "char",
+        lua.create_function(move |_lua, (pos, c): (Vec<usize>, char)| {
+            let _ = tx.send(PluginAction::SetCharAt { pos, c });
+            Ok(())
+        })?,
+    )
+}
+
+// editor.insert.char(pos: vec<usize>, txt: char)
+fn insert_char_at(
+    lua: &mlua::Lua,
+    tx: &Sender<PluginAction>,
+    insert_table: &mlua::Table,
+) -> Result<(), mlua::Error> {
+    let tx = tx.clone();
+    insert_table.set(
+        "char",
+        lua.create_function(move |_lua, (pos, txt): (Vec<usize>, String)| {
+            let _ = tx.send(PluginAction::InsertStrAt { pos, txt: txt });
+            Ok(())
+        })?,
+    )
+}
+
+// editor.get.cursor
+fn get_char_at_cursor(
+    lua: &mlua::Lua,
+    tx: &Sender<PluginAction>,
+    get_table: &mlua::Table,
+) -> Result<(), mlua::Error> {
+    let responder = Arc::new(CharResponder {
+        c: Mutex::new(None),
+        signal: Condvar::new(),
+    });
+
+    let responder_clone = responder.clone();
+    let tx = tx.clone();
+
+    get_table.set(
+        "cursor",
+        lua.create_function(move |lua, ()| {
+            let _ = tx.send(PluginAction::GetCharAtCursor {
+                responder: responder_clone.clone(),
+            });
+            let mut lock = responder_clone.c.lock();
+            if lock.is_none() {
+                responder_clone.signal.wait(&mut lock);
+            }
+
+            let info = lock.clone();
+            if info.is_some() {
+                lua.to_value(&info.unwrap())
+            } else {
+                lua.to_value(&mlua::Nil)
+            }
+        })?,
+    )
+}
+
+// editor.set.cursor
+fn set_char_at_cursor(
+    lua: &mlua::Lua,
+    tx: &Sender<PluginAction>,
+    set_table: &mlua::Table,
+) -> Result<(), mlua::Error> {
+    let tx = tx.clone();
+    set_table.set(
+        "cursor",
+        lua.create_function(move |_lua, c: char| {
+            let _ = tx.send(PluginAction::SetCharAtCursor { c });
+            Ok(())
+        })?,
+    )
+}
+
+// editor.insert.cursor(txt: char)
+fn insert_str_at_cursor(
+    lua: &mlua::Lua,
+    tx: &Sender<PluginAction>,
+    insert_table: &mlua::Table,
+) -> Result<(), mlua::Error> {
+    let tx = tx.clone();
+    insert_table.set(
+        "cursor",
+        lua.create_function(move |_lua, txt: String| {
+            let _ = tx.send(PluginAction::InsertStrAtCursor { txt: txt });
+            Ok(())
+        })?,
+    )
+}
+
+// editor.insert.str(pos: Vec<usize>)
+fn insert_str_at(
+    lua: &mlua::Lua,
+    tx: &Sender<PluginAction>,
+    insert_table: &mlua::Table,
+) -> Result<(), mlua::Error> {
+    let tx = tx.clone();
+    insert_table.set(
+        "str",
+        lua.create_function(move |_lua, txt: String| {
+            let _ = tx.send(PluginAction::InsertStrAtCursor { txt: txt });
+            Ok(())
+        })?,
+    )
+}
+
+pub fn integrate_editor(lua: &mlua::Lua, tx: &Sender<PluginAction>) -> Result<(), mlua::Error> {
+    let editor_table = lua.create_table()?;
+    let insert_table = lua.create_table()?;
+    let get_table = lua.create_table()?;
+    let set_table = lua.create_table()?;
+
+    insert_str_at_cursor(lua, tx, &insert_table)?;
+    insert_char_at(lua, tx, &insert_table)?;
+    insert_str_at(lua, tx, &insert_table)?;
+
+    set_char_at(lua, tx, &set_table)?;
+    set_str_at(lua, tx, &set_table)?;
+    set_char_at_cursor(lua, tx, &set_table)?;
+    set_line_at(lua, tx, &insert_table)?;
+
+    get_line(lua, tx, &get_table)?;
+    get_str_at(lua, tx, &get_table)?;
+    get_char_at(lua, tx, &get_table)?;
+    get_char_at_cursor(lua, tx, &get_table)?;
+
+    editor_table.set("insert", insert_table)?;
+    editor_table.set("get", get_table)?;
+    editor_table.set("set", set_table)?;
+
+    let proxy = lua.create_table()?;
+    let metatable = lua.create_table()?;
+
+    let internal_editor = editor_table.clone();
+    metatable.set(
+        "__index",
+        lua.create_function(move |_, (_, key): (mlua::Value, String)| {
+            internal_editor.get::<mlua::Value>(key)
+        })?,
+    )?;
+
+    proxy.set_metatable(Some(metatable))?;
+
+    lua.globals().set("editor", proxy)?;
+
+    Ok(())
+}

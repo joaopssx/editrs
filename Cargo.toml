@@ -1,0 +1,69 @@
+[package]
+name = "sprig"
+version = "0.2.0"
+edition = "2024"
+#license = "BSD-2-Clause"
+
+[dependencies]
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = { version = "1.0.149", features = ["preserve_order"] }
+ignore = "0.4.25"               # Git ignore file usage
+crossbeam-channel = "0.5.15"    # Thread data sending
+vt100 = "0.16.2"                # Terminal output handling
+aho-corasick = "1.1.4"          # Efficient searching
+mlua = { version = "0.11.6", features = ["lua55", "serialize", "serde", "vendored", "send"] } # lua
+indexmap = "2.14.0"             # Pair map
+parking_lot = "0.12.5"          # Thread pausing and other things
+hashbrown = "0.17.0"            # Hash map replacement
+compact_str = "0.9.0"           # SSO strings
+rayon = "1.12.0"                # Thread pooler
+arc-swap = "1.9.1"              # Arc pointer swapping
+mimalloc = "0.1.50"             # Global allocator
+bumpalo = "3.20.2"              # Grouped allocation
+pgp = "0.19.0"                  # Marketplace PGP verification
+reqwest = { version = "0.13.3", features = ["blocking", "json"] } # Networking
+tokio = "1.52.3"                # Async for networking
+online = { version = "4.0.2", features = ["tokio"] }
+modular-bitfield = "0.13.1"
+smol_str = "0.2.2"
+pulldown-cmark = "0.13.4"
+ratatui = "0.30"                # Rendering
+triomphe = "0.1.15"             # Arc
+portable-pty = "0.9.0"          # Terminal; May support other OSes
+crossterm = "0.29.0"            # Keyboard input
+syntect = "5.3.0"               # Highlighting
+termimad = "0.34.1"             # MD Rendering
+
+# MacOS, Windows, Linux
+[target.'cfg(any(target_os="linux", target_os="windows", target_os="macos"))'.dependencies]
+gix="0.83.0"                    # git
+arboard = { version = "3.6.1", default-features = false }  # Clip board
+
+# FreeBSD
+[target.'cfg(target_os="freebsd")'.dependencies]
+syntect = "5.3.0"               # Syntax highlighting
+crossterm = "0.29.0"            # Keyboard input
+
+# FreeBSD, OpenBSD, NetBSD, and DragonflyBSD
+[target.'cfg(any(target_os="freebsd", target_os="openbsd", target_os="netbsd", target_os="dragonfly"))'.dependencies]
+git2 = "0.20.4"                 # git
+
+# Linux
+[target.'cfg(target_os = "linux")'.dependencies]
+evdev = "0.13.2"                # Caps lock detection
+glob = "0.3.3"                  # File pattern searching
+
+# Windows
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.61.2", features = ["Win32_UI_Input_KeyboardAndMouse"] }
+
+[build-dependencies]
+ureq = "3.3.0"
+tar  = "0.4.46"
+xz2  = "0.1.7"
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+
+[profile.release.package."*"]

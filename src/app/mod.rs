@@ -1,0 +1,1833 @@
+use crate::app::langs::Languages;
+use crate::app::marketplace::MarketplacePlugin;
+use crate::config::Config;
+use crate::core::editor::Editor;
+use crate::core::{git, terminal, tree};
+use crate::input::action::SidebarCategory;
+use crate::plugin::action::PluginAction;
+use crate::windows::modal::{Modal, ModalType};
+use aho_corasick::AhoCorasick;
+use compact_str::CompactString;
+use crossbeam_channel::Receiver;
+use crossterm::event::{self, Event};
+use hashbrown::HashMap;
+use hashbrown::HashSet;
+use parking_lot::{Mutex, RwLock};
+use rayon::{self, prelude::*};
+use serde_json::{Value, json};
+use std::collections::VecDeque;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::time::Duration;
+use syntect::{highlighting::ThemeSet, parsing::SyntaxSet};
+use triomphe::Arc;
+
+pub mod langs;
+mod ui;
+pub use crate::get_trans;
+pub mod marketplace;
+
+pub struct SearchResult {
+    pub filepath: PathBuf,
+    pub line_number: usize,
+    pub content: CompactString,
+}
+
+pub struct App {
+    pub language: Languages,                 // Language to display text editor in
+    pub editors: Vec<Editor>,                // All open editors
+    pub active_tab: usize,                   // Current active tab
+    pub config: Config,                      // Configuration of editor(s) and plugin(s)
+    pub modal: Option<Modal>,                // Selection windows (confirm leave, new file, etc.)
+    pub should_quit: bool,                   // Whether Sprig should quit or not
+    pub syntax_set: SyntaxSet,               // Syntax set for languages
+    pub theme_set: ThemeSet,                 // Highlighting colors
+    pub workspace: Option<tree::FileTree>,   // Sidebar things
+    pub sidebar_category: SidebarCategory,   // Current sidebar piece open
+    pub search_query: CompactString,         // What to look for
+    pub search_results: Vec<SearchResult>,   // Results of a serarch
+    pub search_selected: usize,              // Selected search result
+    pub search_scroll: usize,                // Scroll amount on search results
+    pub search_num_files: usize,             // Number of files with contents found
+    pub search_num_occurrences: usize,       // Number of times a query found
+    pub search_advanced: Vec<CompactString>, // Advanced search input (*.f, /dev/, etc.)
+    pub git_manager: git::GitManager,        // Git
+    pub git_changes: Vec<git::GitFileChange>, // Every change Git found
+    pub git_scroll: usize,                   // Scroll on Git
+    pub git_selected: usize,                 // File selected in Git view
+    pub settings_selected: usize,            // Selected setting
+    pub settings_scroll: usize,              // Settings scroll
+    pub terminal: terminal::Terminal,        // Builtin terminal
+    pub terminal_visible: bool,              // If the terminal is visible
+    pub debug_console_visible: bool,         // If the debug console is visible
+    pub dirty: bool,                         // If the terminal needs to be updated
+    pub plugin_rx: Receiver<PluginAction>,   // Lua plugin reciever
+    pub whitespace_cache: Arc<RwLock<Vec<usize>>>, // Where whitespace is in the editor
+    pub host_terminal_height: u16,           // True height of terminal we're running in
+    pub host_terminal_width: u16,            // True height of terminal we're running in
+    pub debug_logs: VecDeque<CompactString>, // Lua plugin print function routed here
+    pub os: CompactString,                   // String of what the OS is (not OsString)
+    pub key_pressed: Mutex<Option<CompactString>>, // Which key was pressed
+    pub focused: bool,                       // Whether the terminal is focused or not
+    pub marketplace_item_selected: usize,    // Number of selected item
+    pub marketplace_plugins: Vec<MarketplacePlugin>, // Title and description of every plugin
+    pub marketplace_error: Option<String>,   // The error (if any) from reqwest
+    pub market_state: Arc<RwLock<(bool, Result<Vec<MarketplacePlugin>, String>)>>, // The state of the maket
+    pub market_search_query: CompactString,                                        // Plugin search
+    pub marketplace_listed_items: Vec<MarketplacePlugin>, // Every marketplace item listed
+    pub online: bool,                                     // Whether the user has internet or not
+    pub cursor_pos: usize,                                // Curosor position for use in sidebar
+    pub resized: bool,                                    // Whether the terminal has been resized
+    pub commands: Vec<&'static str>,                      // Commands, and what to do
+    pub plugin_commands: Vec<(String, mlua::Function)>, // Funcitons provided by plugins for commands to run
+    pub translations: HashMap<WorldStrings, &'static str>, // Translations of every piece of text (excluding plugins)
+}
+
+pub fn fuzzy_match(haystack: &str, needle: &str) -> bool {
+    let mut chars = haystack.chars();
+    needle
+        .chars()
+        .all(|n| chars.any(|h| h.eq_ignore_ascii_case(&n)))
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+pub enum WorldStrings {
+    OpenTerminalCommand,
+    OpenSettingsCommand,
+    GotoEditorEndCommand,
+    GotoEditorStartCommand,
+    CloseSprigCommand,
+    OpenHelpCommand,
+
+    CorruptedPluginsError,
+    WebsiteDownOrBlockedError,
+    NoInternetError,
+    ConnectionTimeOutError,
+    InternetUnknownError,
+    ConnectingToInternet,
+
+    WordSetting,
+    WordMarketplace,
+    WordSearch,
+    WordGitStatus,
+    WordExplorer,
+
+    ShortHandDiff,
+}
+
+impl App {
+    pub fn new(plugin_rx: Receiver<PluginAction>) -> Self {
+        let path = if cfg!(windows) {
+            PathBuf::from(std::env::var("APPDATA").unwrap()).join("sprig")
+        } else {
+            PathBuf::from(std::env::var("USERPROFILE").unwrap())
+                .join(".config")
+                .join("sprig")
+        };
+
+        let user_lang = std::fs::read_to_string(path.join("config.jsonc"))
+            .map(|contents| {
+                // grab the first line and check for a shebang
+                contents
+                    .lines()
+                    .next()
+                    .and_then(|line| line.strip_prefix("#!"))
+                    .map(|lang| lang.trim().to_string())
+                    .unwrap_or_else(|| "English".to_string())
+            })
+            .unwrap_or_else(|_| "English".to_string());
+
+        let lang_setting = langs::undo_pretty_name(&user_lang);
+        drop(user_lang);
+
+        // The lazy lock makes it so we enforce a
+        let strings = crate::app::langs::build_lang_map(lang_setting);
+
+        Self {
+            // TODO: Read a config to get this
+            language: lang_setting,
+            editors: vec![],
+            active_tab: 0,
+            config: crate::config::default(),
+            modal: None,
+            should_quit: false,
+            syntax_set: SyntaxSet::load_defaults_newlines(),
+            theme_set: ThemeSet::load_defaults(),
+            workspace: None,
+            sidebar_category: SidebarCategory::FileTree,
+            search_query: CompactString::default(),
+            search_results: vec![],
+            search_selected: 0,
+            search_scroll: 0,
+            search_num_files: 0,
+            search_num_occurrences: 0,
+            search_advanced: vec![],
+            git_manager: git::GitManager::new(),
+            git_changes: vec![],
+            git_scroll: 0,
+            git_selected: 0,
+            settings_selected: 0,
+            settings_scroll: 0,
+            terminal: terminal::Terminal::new(PathBuf::from(".")),
+            terminal_visible: false,
+            debug_console_visible: false,
+            dirty: true,
+            plugin_rx,
+            whitespace_cache: Arc::new(RwLock::new(Vec::new())),
+            host_terminal_height: 0,
+            host_terminal_width: 0,
+            debug_logs: VecDeque::with_capacity(40),
+            os: CompactString::new(if cfg!(target_os = "windows") {
+                "Windows "
+            } else if cfg!(target_os = "macos") {
+                "MacOS "
+            } else if cfg!(target_os = "linux") {
+                // In the future, we could parse PRETTY_NAME too, to get a better hint at what the OS is
+                // Since some distros like Bodhi have Ubuntu as NAME, but Bodhi [version] as PRETTY_NAME
+                //
+                // ID is a similar story
+                //
+                // We could also parse ID_LIKE to get an idea on the logo to use, and dynamically build
+                let linux_name = String::from_utf8(
+                    fs::read("/etc/os-release")
+                        .unwrap_or_else(|_| b"NAME=\"THIS IS NOT LINUX\"".to_vec()),
+                )
+                .unwrap();
+                let linux_name = linux_name
+                    .lines()
+                    .find(|line| line.starts_with("NAME="))
+                    .and_then(|line| line.splitn(2, '=').nth(1))
+                    .map(|value| value.trim_matches('"'))
+                    .unwrap();
+                match linux_name {
+                    "Pop!_OS" => "Pop!_OS ",
+                    "Arch Linux" | "Arch Linux 32" => "Arch Linux 󰣇",
+                    "Fedora Linux" | "Fedora Remix for WSL" => "Fedora ",
+                    "Gentoo Linux" => "Gentoo ",
+                    "Red Hat Linux" | "Red Hat Enterprise Linux" => "Red Hat ",
+                    "AlmaLinux" => "AlmaLinux ",
+                    "AOSC OS" => "AOSC ",
+                    "Artix Linux" => "Artix ",
+                    "CentOS" | "CentOS Linux" | "CentOS Stream" => "CentOS ",
+                    "Cygwin" => "Cygwin ",
+                    "Debian GNU/Linux" => "Debian ",
+                    "elementary OS" => "ElementaryOS ",
+                    "EndeavourOS" => "EndeavourOS ",
+                    "Garuda Linux" => "Garuda ",
+                    "illumos" => "Illumos ",
+                    "Kali GNU/Linux" => "Kali Linux ",
+                    "Manjaro Linux" | "Manjaro-ARM" => "Manjaro ",
+                    "Linux Mint" => "Linux Mint 󰣭",
+                    "NixOS" => "NixOS ",
+                    "Nobara Linux" => "Nobara Linux ",
+                    "Raspbian GNU/Linux" => "Raspbian ",
+                    "Rocky Linux" => "RockyLinux ",
+                    "openSUSE" | "openSUSE Leap" | "openSUSE Tumbleweed" => "openSUSE ",
+                    "SLES" | "SUSE Linux Enterprise Server" | "SLES_SAP" | "SLE Micro" | "SLED" => {
+                        "SUSE "
+                    }
+                    "Solus" => "Solus ",
+                    "Ubuntu" | "Ubuntu Kylin" => "Ubuntu 󰕈", // could also be UwUntu
+                    "Void Linux" => "Void Linux ",
+                    "Zorin OS" => "Zorin ",
+                    "Puppy" | "Puppy Linux" | "FossaPup64" | "BionicPup" | "BookwormPup64"
+                    | "BookwormPup32" | "NoblePup32" => "Puppy Linux ",
+                    "Qubes OS" => "Qubes ",
+                    "Tails" => "Tails ",
+                    "SteamOS" => "SteamOS ",
+                    "TileOS" => "TileOS",
+                    "Mageia" => "Mageia ",
+                    "Zenclora" => "Zenclora",
+                    "Archcraft" => "Arch Craft 󰣇",
+                    "XCP-ng" => "XPC-ng",
+                    "Deepin" => "Deepin ",
+                    "Alpine Linux" => "Alpine Linux ",
+                    "starter kit" | "Sisyphus" => "AltLinux",
+                    "Amazon Linux" => "Amazon Linux ",
+                    "Arkane Linux" => "Arkane",
+                    "Aurora" => "Aurora",
+                    "Microsoft Azure Linux" => "Azure Linux ",
+                    "Bazzite" => "Bazzite",
+                    "BlackArch Linux" => "BlackArch Linux 󰣇",
+                    "blendOS" => "BlendOS 󰯯",
+                    "Bluefin" => "Bluefin",
+                    "Buildroot" => "Buildroot",
+                    "CachyOS Linux" => "CachyOS Linux",
+                    "Chimera" | "ChimeraOS" => "Chimera",
+                    "CirrOS" => "CirrOS",
+                    "Clear Linux OS" => "Clear Linux",
+                    "CoreOS" => "CoreOS ",
+                    "Container-Optimized OS" => "Container Optimized OS",
+                    "Cumulus Linux" => "Cumulus Linux",
+                    "Devuan GNU/Linux" => "Devuan",
+                    "Endless OS" => "Endless OS",
+                    "EuroLinux" => "Euro Linux",
+                    "Exherbo" => "Exherbo Linux",
+                    "Flatcar Container Linux by Kinvolk" => "Flatcar Linux",
+                    "funtoo" => "Funtoo Linux",
+                    "GhostBSD" => "GhostBSD ",
+                    "Gnoppix" => "Gnoppix",
+                    "Guix System" => "Guix System",
+                    "Hyperbola" => "Hyperbola Linux",
+                    "KaOS" => "KaOS",
+                    "Common Base Linux Mariner" => "Mariner Linux",
+                    "MIRACLE LINUX" => "Miracle Linux",
+                    "KDE neon" => "Neon ",
+                    "Nexus" => "Nexus",
+                    "NI Linux Real-Time" => "NILRT",
+                    "NovariaOS" => "NovariaOS",
+                    "NurOS" => "NurOS",
+                    "Oracle Linux Server" => "Oracle Linux Server",
+                    "OmniOS" => "OmniOS",
+                    "openEuler" => "openEuler",
+                    "OpenMandriva Lx" => "OpenMandriva ",
+                    "OpenWrt" => "OpenWrt",
+                    "Parrot OS" => "Parrot OS ",
+                    "PCLinuxOS" => "PC Linux",
+                    "Pengwin" => "Pengwin Linux",
+                    "VMware Photon" | "VMware Photon OS" => "Photon",
+                    "PikaOS" => "PikaOS",
+                    "PisiLinux" => "PisiLinux",
+                    "postmarketOS" => "PostMarketOS ",
+                    "PureOS" => "PureOS",
+                    "RancherOS" => "RancherOS ",
+                    "RebornOS Linux" => "RebornOS",
+                    "Scientific Linux" => "Scientific Linux",
+                    "Slackware" => "Slackware ",
+                    "SystemRescue" => "SystemRescue",
+                    "TencentOS Server" => "TencentOS",
+                    "TinyCore" => "TinyCore",
+                    "Trisquel GNU/Linux" => "Trisquel ",
+                    "UbiOS" => "UbiOS",
+                    "Ultramarine Linux" => "Ultramarine Linux",
+                    "Vanilla OS" => "Vanilla OS ",
+                    "Wolfi" => "Wolfi",
+                    "Wind River Linux" => "Wind River Linux",
+                    _ => "Linux ",
+                }
+            } else if cfg!(target_os = "freebsd") {
+                "FreeBSD "
+            // } else if cfg!(target_os = "openbsd") {
+            //     "OpenBSD "
+            // } else if cfg!(target_os = "netbsd") {
+            //     "NetBSD"
+            // } else if cfg!(target_os = "dragonfly") {
+            //     "DragonFlyBSD"
+            } else {
+                unreachable!("This OS is not currently supported for Sprig.")
+            }),
+            key_pressed: Mutex::new(None),
+            focused: true,
+            marketplace_item_selected: 0,
+            marketplace_plugins: Vec::new(),
+            marketplace_error: None,
+            market_state: Arc::new(RwLock::new((
+                false,
+                Result::Err(String::from(get_trans!(
+                    strings,
+                    WorldStrings::ConnectingToInternet
+                ))),
+            ))),
+            market_search_query: CompactString::default(),
+            marketplace_listed_items: vec![],
+            online: false,
+            cursor_pos: 0,
+            resized: false,
+            commands: vec![
+                get_trans!(strings, WorldStrings::OpenSettingsCommand),
+                get_trans!(strings, WorldStrings::GotoEditorEndCommand),
+                get_trans!(strings, WorldStrings::GotoEditorStartCommand),
+                get_trans!(strings, WorldStrings::CloseSprigCommand),
+                get_trans!(strings, WorldStrings::OpenTerminalCommand),
+                get_trans!(strings, WorldStrings::OpenHelpCommand),
+            ],
+            plugin_commands: vec![],
+            translations: strings,
+        }
+    }
+
+    pub fn load_workspace(&mut self, path: &Path) {
+        let path = &path.canonicalize().unwrap_or(path.to_path_buf());
+
+        self.workspace = Some(tree::FileTree::new(path.to_path_buf()));
+        self.git_manager.set_root(path);
+        self.refresh_git();
+        let _ = self
+            .terminal
+            .tx
+            .send(format!("cd {}\n", path.display()).as_bytes().to_vec());
+    }
+
+    pub fn open_diff(&mut self, change_idx: usize) {
+        if let Some(change) = self.git_changes.get(change_idx).cloned() {
+            let mut editor = Editor::new();
+            let mut lines = vec![
+                CompactString::from(format!(
+                    "{}: {}",
+                    get_trans!(self.translations, WorldStrings::ShortHandDiff),
+                    change.path
+                )),
+                CompactString::default(),
+            ];
+            for dl in change.diff {
+                lines.push(dl.content);
+            }
+            editor.load_diff(Path::new(&change.path), lines);
+            self.editors.push(editor);
+            self.active_tab = self.editors.len() - 1;
+        }
+    }
+
+    pub fn open_file(&mut self, path: &Path, force_new_tab: bool) {
+        // Check if file is already open
+        let already_open = self.editors.iter().position(|e| {
+            if let Some(p) = &e.filepath {
+                p == path
+            } else {
+                false
+            }
+        });
+
+        if self.workspace.is_none() {
+            let workspace = path.parent().unwrap_or(Path::new("."));
+            self.load_workspace(workspace);
+        }
+
+        if let Some(idx) = already_open {
+            self.active_tab = idx;
+        } else {
+            let mut editor = Editor::new();
+            if editor.load_file(path) {
+                let current_is_dirty = self.current_editor().map_or(false, |e| e.dirty);
+                if force_new_tab
+                    || (self.editors.is_empty())
+                    || (self.editors.len() == 1 && current_is_dirty)
+                {
+                    self.editors.push(editor);
+                    self.active_tab = self.editors.len() - 1;
+                } else if self.editors.len() == 1
+                    && self.editors[0].lines.len() == 1
+                    && self.editors[0].lines[0].is_empty()
+                    && !self.editors[0].dirty
+                {
+                    self.editors[0] = editor;
+                } else {
+                    self.editors[self.active_tab] = editor;
+                }
+            }
+        }
+    }
+
+    pub fn current_editor_mut(&mut self) -> Option<&mut Editor> {
+        if self.editors.is_empty() {
+            None
+        } else {
+            Some(&mut self.editors[self.active_tab])
+        }
+    }
+
+    pub fn current_editor(&self) -> Option<&Editor> {
+        if self.editors.is_empty() {
+            None
+        } else {
+            Some(&self.editors[self.active_tab])
+        }
+    }
+
+    pub fn run(&mut self, term: &mut ratatui::DefaultTerminal) -> std::io::Result<()> {
+        //let cell = Arc::clone(&self.market_state);
+        while !self.should_quit {
+            let cell = Arc::clone(&self.market_state);
+            let lang = self.translations.clone();
+            rayon::spawn(move || {
+                if online::check(None).is_ok() {
+                    let result = match reqwest::blocking::get("https://sprig.swimming.cat/search/") {
+                        Ok(resp) => match resp.json::<Vec<MarketplacePlugin>>() {
+                            Ok(plugins) => Ok(plugins),
+                            Err(_) => Err(String::from(get_trans!(
+                                lang,
+                                WorldStrings::CorruptedPluginsError
+                            ))),
+                        },
+                        Err(e) if e.is_connect() => Err(String::from(get_trans!(
+                            lang,
+                            WorldStrings::WebsiteDownOrBlockedError
+                        ))),
+                        Err(e) if e.is_timeout() => Err(String::from(get_trans!(
+                            lang,
+                            WorldStrings::ConnectionTimeOutError
+                        ))),
+                        Err(_) => Err(String::from(get_trans!(
+                            lang,
+                            WorldStrings::InternetUnknownError
+                        ))),
+                    };
+                    *cell.write() = (true, result);
+                } else {
+                    *cell.write() = (
+                        false,
+                        Err(String::from(get_trans!(
+                            lang,
+                            WorldStrings::NoInternetError
+                        ))),
+                    );
+                }
+            });
+
+            let state = self.market_state.read();
+            let (online, result) = &*state;
+            self.online = *online;
+            match result {
+                Ok(plugins) => self.marketplace_plugins = plugins.clone(),
+                Err(msg) => self.marketplace_error = Some(msg.clone()),
+            }
+            drop(state);
+
+            while let Ok(action) = self.plugin_rx.try_recv() {
+                match action {
+                    PluginAction::MakeCommand { name, func } => {
+                        self.plugin_commands.push((name, func));
+                    }
+                    PluginAction::RemoveCommand { name } => {
+                        self.plugin_commands
+                            .iter()
+                            .position(|command_name| command_name.0 == name)
+                            .and_then(|pos| Some(self.plugin_commands.remove(pos)));
+                    }
+                    PluginAction::MakeSetting { name, value } => {
+                        self.config.insert(name, json!(value));
+                    }
+                    PluginAction::InsertStrAtCursor { txt } => {
+                        if let Some(editor) = self.current_editor_mut() {
+                            editor.lines[editor.cursor_x].insert_str(editor.cursor_y, &txt);
+                        }
+                    }
+                    PluginAction::GetSettingValue { name, responder } => {
+                        let val = self
+                            .config
+                            .get(&name)
+                            .cloned()
+                            .unwrap_or(serde_json::Value::Null);
+
+                        let mut lock = responder.value.lock();
+                        *lock = Some(val);
+                        responder.signal.notify_one();
+                    }
+                    PluginAction::DebugLog { message } => {
+                        self.debug_logs.push_back(CompactString::from(message));
+                        if self.debug_console_visible {
+                            self.dirty = true;
+                        }
+                    }
+                    PluginAction::SetSetting { name, value } => {
+                        self.config.insert(name, json!(value));
+                    }
+                    PluginAction::GetKeyPress { responder } => {
+                        // Since this is something dependent on the user, if they don't have Sprig focused,
+                        // they can't type, so it's faster to give a value instead of get a value then
+                        // give the value back to the plugin
+                        let mut lock = responder.string.lock();
+
+                        if self.focused {
+                            *lock = self.key_pressed.lock().take().map(|key| key.to_string());
+                        } else {
+                            *lock = None;
+                        }
+
+                        responder.signal.notify_one();
+                    }
+                    PluginAction::GetStrAt {
+                        from,
+                        to,
+                        responder,
+                    } => {
+                        if let Some(editor) = self.current_editor() {
+                            let val: CompactString = if editor.lines[from[1]].len() <= from[1]
+                                && editor.lines[to[1]].len() <= to[1]
+                            {
+                                editor.lines[from[0]]
+                                    .to_string()
+                                    .chars()
+                                    .skip(from[1])
+                                    .take(to[1] - from[1])
+                                    .collect::<String>()
+                                    .into()
+                            } else {
+                                CompactString::default()
+                            };
+                            let mut lock = responder.string.lock();
+                            *lock = Some(String::from(val));
+                            responder.signal.notify_one();
+                        }
+                    }
+                    PluginAction::GetCursorX { responder } => {
+                        let mut lock = responder.number.lock();
+                        *lock = self.current_editor().map(|editor| editor.cursor_x);
+                        responder.signal.notify_one();
+                    }
+                    PluginAction::GetCursorY { responder } => {
+                        let mut lock = responder.number.lock();
+                        *lock = self.current_editor().map(|editor| editor.cursor_y);
+                        responder.signal.notify_one();
+                    }
+                    PluginAction::SetCursorPos { pos } => {
+                        if let Some(editor) = self.current_editor_mut() {
+                            editor.cursor_x = pos[0];
+                            editor.cursor_y = pos[1];
+                            self.dirty = true;
+                        }
+                    }
+                    PluginAction::GetCursorPos { responder } => {
+                        if let Some(editor) = self.current_editor() {
+                            let val = Some(vec![editor.cursor_x, editor.cursor_y]);
+                            let mut lock = responder.numbers.lock();
+                            *lock = val;
+                            responder.signal.notify_one();
+                        }
+                    }
+                    PluginAction::SetCursorX { x } => {
+                        if let Some(editor) = self.current_editor_mut() {
+                            editor.cursor_x = x;
+                            self.dirty = true;
+                        }
+                    }
+                    PluginAction::SetCursorY { y } => {
+                        if let Some(editor) = self.current_editor_mut() {
+                            editor.cursor_y = y;
+                            self.dirty = true;
+                        }
+                    }
+                    PluginAction::GetLine { line, responder } => {
+                        if let Some(editor) = self.current_editor() {
+                            let val = if line <= editor.lines.len() {
+                                editor.lines[line].clone()
+                            } else {
+                                CompactString::default()
+                            };
+                            let mut lock = responder.string.lock();
+                            *lock = Some(String::from(val));
+                            responder.signal.notify_one();
+                        }
+                    }
+                    PluginAction::SetLine { line, contents } => {
+                        if let Some(editor) = self.current_editor_mut() {
+                            if line <= editor.lines.len() {
+                                editor.lines[line] = CompactString::from(contents);
+                                editor.dirty = true;
+                            }
+                            self.dirty = true;
+                        }
+                    }
+                    PluginAction::SetStrAt { from, to, txt } => {
+                        if let Some(editor) = self.current_editor_mut() {
+                            let (start_x, start_y) = (from[0], from[1]);
+                            let (end_x, end_y) = (to[0], to[1]);
+
+                            // Basic bounds check to prevent panics
+                            if start_y < editor.lines.len()
+                                && end_y < editor.lines.len()
+                                && start_y < end_y
+                            {
+                                // Calculate byte offsets for the start and end of the selection
+                                // We use char_indices to remain UTF-8 safe
+                                let start_byte = editor.lines[start_y]
+                                    .char_indices()
+                                    .nth(start_x)
+                                    .map(|(i, _)| i);
+                                let end_byte = editor.lines[end_y]
+                                    .char_indices()
+                                    .nth(end_x)
+                                    .map(|(i, c)| i + c.len_utf8());
+
+                                if let (Some(s_idx), Some(e_idx)) = (start_byte, end_byte) {
+                                    // Get the last line (incase only some was changed)
+                                    let line_suffix = editor.lines[end_y].split_off(e_idx);
+
+                                    // Modify the first line incase not all of it was changed
+                                    let first_line = &mut editor.lines[start_y];
+                                    first_line.truncate(s_idx);
+                                    first_line.push_str(&txt);
+                                    first_line.push_str(&line_suffix);
+
+                                    // Add in everything else
+                                    editor.lines.drain((start_y + 1)..=end_y);
+                                }
+                            }
+                        }
+                    }
+                    PluginAction::InsertStrAt { pos, txt } => {
+                        if let Some(editor) = self.current_editor_mut() {
+                            if pos[0] <= editor.lines.len() {
+                                editor.lines[pos[0]].insert_str(pos[1], &txt);
+                            }
+                        }
+                    }
+                    PluginAction::GetCharAtCursor { responder } => {
+                        if let Some(editor) = self.current_editor() {
+                            let val = Some(
+                                editor.lines[editor.cursor_y].as_bytes()[editor.cursor_x] as char,
+                            );
+                            let mut lock = responder.c.lock();
+                            *lock = val;
+                            responder.signal.notify_one();
+                        }
+                    }
+                    PluginAction::GetCharAt { pos, responder } => {
+                        if let Some(editor) = self.current_editor() {
+                            let val: Option<char> = if editor.lines[pos[1]].len() <= pos[0] {
+                                Some(editor.lines[pos[1]].as_bytes()[pos[0]] as char)
+                            } else {
+                                None
+                            };
+                            let mut lock = responder.c.lock();
+                            *lock = val;
+                            responder.signal.notify_one();
+                        }
+                    }
+                    PluginAction::InsertCharAt { pos, c } => {
+                        if let Some(editor) = self.current_editor_mut() {
+                            if let Some(line) = editor.lines.get_mut(pos[1]) {
+                                line.insert(pos[0], c);
+                            }
+                        }
+                    }
+                    PluginAction::InsertCharAtCursor { c } => {
+                        if let Some(editor) = self.current_editor_mut() {
+                            if let Some(line) = editor.lines.get_mut(editor.cursor_y) {
+                                line.insert(editor.cursor_x, c);
+                            }
+                        }
+                    }
+                    PluginAction::SetCharAt { pos, c } => {
+                        if let Some(editor) = self.current_editor_mut() {
+                            if let Some(line) = editor.lines.get_mut(pos[1]) {
+                                // Find the byte range of the character at the given visual index
+                                let target_char = line.char_indices().nth(pos[0]);
+
+                                if let Some((idx, old_char)) = target_char {
+                                    // CompactString supports replace_range like a normal String
+                                    let end_idx = idx + old_char.len_utf8();
+                                    line.replace_range(idx..end_idx, &c.to_string());
+                                }
+                            }
+                        }
+                    }
+                    PluginAction::SetCharAtCursor { c } => {
+                        if let Some(editor) = self.current_editor_mut() {
+                            if let Some(line) = editor.lines.get_mut(editor.cursor_y) {
+                                let target_char = line.char_indices().nth(editor.cursor_x);
+
+                                if let Some((idx, old_char)) = target_char {
+                                    let end_idx = idx + old_char.len_utf8();
+                                    line.replace_range(idx..end_idx, &c.to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            self.resized = term.autoresize().is_ok();
+
+            if self.focused || self.resized {
+                if !self.dirty {
+                    self.dirty = self.terminal_visible && self.terminal.update();
+                }
+
+                if self.dirty || self.focused {
+                    // Since dirty is now only triggered on changes, including height,
+                    // we set it here to give the most accurate info, with anything that
+                    // might access it in the future :)
+                    let height_size = term.size().unwrap();
+                    (self.host_terminal_height, self.host_terminal_width) =
+                        (height_size.height, height_size.width);
+
+                    term.draw(|f| ui::draw(f, self))?;
+                    self.dirty = false;
+                    self.resized = false;
+                }
+            }
+
+            if event::poll(Duration::from_millis(10))? {
+                let event = event::read()?;
+                match event {
+                    Event::Key(key) => self.handle_key(key),
+                    Event::FocusLost => self.focused = false,
+                    Event::FocusGained => self.focused = true,
+                    _ => {}
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn handle_key(&mut self, key: event::KeyEvent) {
+        use crate::input::{action::Action, keymap};
+        use crossterm::event::{KeyCode, KeyModifiers, KeyEventKind};
+        if key.kind != KeyEventKind::Press {
+            return;
+        }
+
+        if self.terminal_visible {
+            // Check for toggle keys or ESC
+            let is_ctrl_t =
+                key.code == KeyCode::Char('t') && key.modifiers.contains(KeyModifiers::CONTROL);
+            let is_f5 = key.code == KeyCode::F(5);
+            let is_esc = key.code == KeyCode::Esc;
+
+            if is_ctrl_t || is_f5 || is_esc {
+                self.dispatch(Action::ToggleTerminal);
+                return;
+            }
+
+            self.dispatch(Action::TerminalInput(key));
+            return;
+        }
+
+        let in_modal = self.modal.is_some();
+        let is_tree_focused = self.workspace.as_ref().map_or(false, |w| w.focused);
+        if let Some(action) = keymap::map_key(key, in_modal, is_tree_focused) {
+            self.dispatch(action);
+        }
+        self.key_pressed = Mutex::new(Some(CompactString::from(key.code.to_string())));
+        self.dirty = true;
+    }
+
+    pub fn close_current_editor(&mut self) {
+        self.editors.remove(self.active_tab);
+        if self.active_tab >= self.editors.len() {
+            self.active_tab = self.editors.len().saturating_sub(1);
+        }
+    }
+
+    pub fn dispatch(&mut self, action: crate::input::action::Action) {
+        use crate::input::action::Action;
+        use crate::windows::modal::ModalType;
+
+        // Route Modal actions
+        if let Some(ref mut modal) = self.modal {
+            match action {
+                Action::CloseModal => {
+                    self.modal = None;
+                    return;
+                }
+                Action::ModalInsert(c) => {
+                    modal.insert_char(c);
+                    self.cursor_pos += 1;
+                    match modal.modal_type {
+                        ModalType::NewFile => self.validate_new_file(),
+                        _ => {}
+                    }
+                }
+                Action::ModalBackspace => {
+                    self.cursor_pos = self.cursor_pos.saturating_sub(1);
+                    modal.remove_char(self.cursor_pos);
+                    match modal.modal_type {
+                        ModalType::NewFile => self.validate_new_file(),
+                        _ => {}
+                    }
+                }
+                Action::ModalDelete => {
+                    modal.remove_char(self.cursor_pos);
+                    match modal.modal_type {
+                        ModalType::NewFile => self.validate_new_file(),
+                        _ => {}
+                    }
+                }
+                Action::ModalTab => match modal.modal_type {
+                    ModalType::Replace => modal.toggle_focus(),
+                    ModalType::QuitPrompt => {
+                        modal.active_button += 1;
+                        if modal.active_button >= 3 {
+                            modal.active_button = 0;
+                        }
+                    }
+                    ModalType::ConfirmExit => {
+                        modal.active_button += 1;
+                        if modal.active_button >= 2 {
+                            modal.active_button = 0;
+                        }
+                    }
+                    ModalType::Search => self.find_next_match(),
+                    _ => {}
+                },
+                Action::ModalLeft => match modal.modal_type {
+                    ModalType::ConfirmExit => {
+                        modal.active_button = modal.active_button.saturating_sub(1);
+                    }
+                    ModalType::Search => {
+                        self.cursor_pos = self.cursor_pos.saturating_sub(1);
+                    }
+                    _ => {}
+                },
+                Action::ModalRight => match modal.modal_type {
+                    ModalType::Search => {
+                        if modal.focus_replace {
+                            if modal.replace_input.len() > self.cursor_pos {
+                                self.cursor_pos += 1;
+                            }
+                        } else {
+                            if modal.input.len() > self.cursor_pos {
+                                self.cursor_pos += 1;
+                            }
+                        }
+                    }
+                    ModalType::ConfirmExit => {
+                        if modal.active_button < 1 {
+                            modal.active_button += 1;
+                        }
+                    }
+                    _ => {}
+                },
+                Action::ModalUp => match modal.modal_type {
+                    ModalType::QuitPrompt | ModalType::CloseTabPrompt | ModalType::DeleteFile => {
+                        modal.active_button = modal.active_button.saturating_sub(1);
+                    }
+                    _ => {}
+                },
+                Action::ModalDown => match modal.modal_type {
+                    ModalType::QuitPrompt | ModalType::CloseTabPrompt => {
+                        if modal.active_button < 2 {
+                            modal.active_button += 1;
+                        }
+                    }
+                    ModalType::DeleteFile => {
+                        if modal.active_button < 1 {
+                            modal.active_button += 1;
+                        }
+                    }
+                    _ => {}
+                },
+                Action::ModalConfirm => {
+                    match modal.modal_type {
+                        ModalType::CommandPallete => {
+                            // There has to be a more manageable way to do this...
+                            let query = modal.input.trim();
+
+                            let chosen_index = self
+                                .commands
+                                .iter()
+                                .position(|cmd| query.is_empty() || fuzzy_match(cmd, query));
+
+                            self.modal = None;
+
+                            match chosen_index {
+                                Some(0) => todo!(
+                                    "Implement opening the settings window command, and implement the window"
+                                ),
+                                Some(1) => {
+                                    if let Some(editor) = self.current_editor_mut() {
+                                        let last_line = editor.lines.len().saturating_sub(1);
+                                        editor.cursor_y = last_line;
+                                        editor.cursor_x = editor.lines[last_line].len();
+                                    }
+                                }
+                                Some(2) => {
+                                    if let Some(editor) = self.current_editor_mut() {
+                                        editor.cursor_x = 0;
+                                        editor.cursor_y = 0;
+                                    }
+                                }
+                                Some(3) => self.should_quit = true,
+                                Some(4) => {
+                                    self.terminal_visible = !self.terminal_visible;
+                                    self.dirty = true;
+                                }
+                                Some(5) => self.modal = Some(Modal::new(ModalType::Help)),
+
+                                _ => {
+                                    if let Some(idx) = chosen_index {
+                                        // If it's beyond core commands, map it to plugin_commands index
+                                        let plugin_idx = idx.saturating_sub(self.commands.len());
+                                        if let Some(command) = self.plugin_commands.get(plugin_idx)
+                                        {
+                                            command.1.call::<()>(()).unwrap();
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        ModalType::Search => {
+                            self.find_next_match();
+                        }
+                        ModalType::Replace => {
+                            self.replace_match();
+                            self.find_next_match();
+                        }
+                        ModalType::ReplaceAll => {
+                            // TODO: Implement better loop stopping
+                            if let Some(modal) = self.modal.take() {
+                                while self.search_num_occurrences != 0 {
+                                    self.replace_match();
+                                    self.find_next_match();
+                                }
+                                self.modal = Some(modal);
+                            }
+                        }
+                        ModalType::DeleteFile => {
+                            match modal.active_button {
+                                0 => self.workspace.as_mut().unwrap().delete_file(),
+                                1 => self.modal = None,
+                                _ => {}
+                            }
+                            self.modal = None;
+                        }
+                        ModalType::QuitPrompt => {
+                            match modal.active_button {
+                                0 => self.should_quit = true, // Discard
+                                1 => self.modal = None,       // Cancel
+                                2 => {
+                                    // Save
+                                    let mut saved = false;
+                                    if let Some(editor) = self.current_editor_mut() {
+                                        if let Some(path) = &editor.filepath {
+                                            let content = editor.lines.join("\n");
+                                            if std::fs::write(path, content).is_ok() {
+                                                editor.dirty = false;
+                                                saved = true;
+                                            }
+                                        }
+                                    }
+                                    if saved {
+                                        self.should_quit = true;
+                                    } else {
+                                        self.modal = None;
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                        ModalType::NewFile => {
+                            let path_str = modal.input.clone();
+                            if !path_str.is_empty() && modal.error_message.is_none() {
+                                let root = if let Some(ws) = &self.workspace {
+                                    &ws.nodes[ws.root].path
+                                } else {
+                                    &PathBuf::from(".")
+                                };
+                                let full_path = root.join(&path_str);
+
+                                // Ensure directory exists
+                                if let Some(parent) = full_path.parent() {
+                                    let _ = std::fs::create_dir_all(parent);
+                                }
+
+                                if let Ok(_) = std::fs::write(&full_path, "") {
+                                    self.modal = None;
+                                    self.open_file(&full_path, true);
+                                }
+                            }
+                        }
+                        ModalType::ConfirmExit => match modal.active_button {
+                            0 => self.modal = None,
+                            1 => self.should_quit = true,
+                            _ => {}
+                        },
+                        ModalType::CloseTabPrompt => {
+                            match modal.active_button {
+                                0 => {
+                                    // Discard
+                                    self.modal = None;
+                                    self.close_current_editor();
+                                }
+                                1 => {
+                                    // Cancel
+                                    self.modal = None;
+                                }
+                                2 => {
+                                    // Save
+                                    self.modal = None;
+                                    self.save_current_file();
+                                    self.close_current_editor();
+                                }
+                                _ => {}
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                _ => {}
+            }
+            return;
+        }
+
+        match action {
+            Action::Focus(focus) => self.focused = focus,
+            Action::SwitchSidebarCategory(category) => {
+                self.cursor_pos = 0;
+                self.sidebar_category = category;
+                if let Some(ws) = &mut self.workspace {
+                    ws.focused = true;
+                    ws.visible = true;
+                }
+                return;
+            }
+            Action::NextSidebarCategory => {
+                self.cursor_pos = 0;
+                // TODO: Turn this into a VecDeque so that it is easier to expand later,
+                //       and it becomes a pointer move instead of an if branch
+                self.sidebar_category = match self.sidebar_category {
+                    SidebarCategory::FileTree => SidebarCategory::Search,
+                    SidebarCategory::Search => SidebarCategory::Git,
+                    SidebarCategory::Git => SidebarCategory::Settings,
+                    SidebarCategory::Settings => SidebarCategory::MarketPlace,
+                    SidebarCategory::MarketPlace => SidebarCategory::FileTree,
+                };
+                if self.sidebar_category == SidebarCategory::Git {
+                    self.refresh_git();
+                }
+                if let Some(ws) = &mut self.workspace {
+                    ws.focused = true;
+                    ws.visible = true;
+                }
+                return;
+            }
+            Action::PrevSidebarCategory => {
+                self.cursor_pos = 0;
+                // TODO: Turn this into a VecDeque so that it is easier to expand later,
+                //       and it becomes a pointer move instead of an if branch
+                self.sidebar_category = match self.sidebar_category {
+                    SidebarCategory::FileTree => SidebarCategory::MarketPlace,
+                    SidebarCategory::Settings => SidebarCategory::Git,
+                    SidebarCategory::Git => SidebarCategory::Search,
+                    SidebarCategory::Search => SidebarCategory::FileTree,
+                    SidebarCategory::MarketPlace => SidebarCategory::Settings,
+                };
+                if self.sidebar_category == SidebarCategory::Git {
+                    self.refresh_git();
+                }
+                if let Some(ws) = &mut self.workspace {
+                    ws.focused = true;
+                    ws.visible = true;
+                }
+                return;
+            }
+            Action::FocusFile(path, line) => {
+                self.open_file(&path, false);
+                if let Some(line_num) = line {
+                    if let Some(editor) = self.current_editor_mut() {
+                        editor.cursor_y = line_num.saturating_sub(1);
+                        editor.cursor_x = 0;
+                    }
+                }
+                if let Some(ws) = &mut self.workspace {
+                    ws.focused = false;
+                }
+                return;
+            }
+            Action::SearchFiles(query) => {
+                self.search_query = query.into();
+                self.perform_search();
+                return;
+            }
+            Action::RefreshGit => {
+                self.refresh_git();
+                return;
+            }
+            Action::OpenDiff(idx) => {
+                self.open_diff(idx);
+                return;
+            }
+            Action::OpenNewFileModal => {
+                self.modal = Some(Modal::new(ModalType::NewFile));
+                return;
+            }
+            Action::ToggleTerminal => {
+                self.terminal_visible = !self.terminal_visible;
+                self.dirty = true;
+                return;
+            }
+            Action::TerminalInput(key) => {
+                self.terminal.handle_key(key);
+                return;
+            }
+            Action::ToggleDebugConsole => {
+                self.debug_console_visible = !self.debug_console_visible;
+                return;
+            }
+            _ => {}
+        }
+
+        let tab_size = self
+            .config
+            .get("Tab Size")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(4);
+
+        let is_tree_focused = self.workspace.as_ref().map_or(false, |w| w.focused);
+        if is_tree_focused {
+            let mut close_focused = false;
+            let mut file_to_open: Option<PathBuf> = None;
+            let mut open_in_new_tab = false;
+
+            {
+                let ws = self.workspace.as_mut().unwrap();
+                // TODO: Make these expandable
+                match action {
+                    Action::InsertChar(c) => {
+                        match self.sidebar_category {
+                            SidebarCategory::Search => {
+                                self.search_query.insert(self.cursor_pos, c);
+                                self.perform_search();
+                            }
+                            SidebarCategory::MarketPlace => {
+                                self.market_search_query.insert(self.cursor_pos, c)
+                            }
+                            SidebarCategory::Settings => {
+                                let setting = self
+                                    .config
+                                    .get_index(self.settings_selected)
+                                    .map(|(k, _)| k.clone())
+                                    .unwrap_or_default();
+
+                                if let Some(Value::String(s)) = self.config.get_mut(&setting) {
+                                    s.insert(self.cursor_pos, c);
+                                }
+                            }
+                            _ => {}
+                        }
+                        self.cursor_pos += 1;
+                    }
+                    Action::BackSpace => {
+                        match self.sidebar_category {
+                            SidebarCategory::Search => {
+                                if self.cursor_pos > 0 && self.search_query.len() > 0 {
+                                    let byte_idx = self
+                                        .search_query
+                                        .char_indices()
+                                        .nth(self.cursor_pos.saturating_sub(1))
+                                        .map(|(i, _)| i)
+                                        .unwrap();
+                                    self.search_query.remove(byte_idx);
+                                }
+                                self.perform_search();
+                            }
+                            SidebarCategory::MarketPlace => {
+                                if self.cursor_pos > 0 && self.market_search_query.len() > 0 {
+                                    let byte_idx = self
+                                        .market_search_query
+                                        .char_indices()
+                                        .nth(self.cursor_pos.saturating_sub(1))
+                                        .map(|(i, _)| i)
+                                        .unwrap();
+                                    self.market_search_query.remove(byte_idx);
+                                }
+                            }
+                            SidebarCategory::Settings => {
+                                let setting = self
+                                    .config
+                                    .get_index(self.settings_selected)
+                                    .map(|(k, _)| k.clone())
+                                    .unwrap_or_default();
+
+                                if let Some(Value::String(s)) = self.config.get_mut(&setting) {
+                                    if self.cursor_pos != 0 {
+                                        let byte_idx = s
+                                            .char_indices()
+                                            .nth(self.cursor_pos.saturating_sub(1))
+                                            .map(|(i, _)| i)
+                                            .unwrap();
+                                        s.remove(byte_idx);
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                        self.cursor_pos = self.cursor_pos.saturating_sub(1);
+                    }
+                    Action::DeleteChar => match self.sidebar_category {
+                        SidebarCategory::MarketPlace => {
+                            if self.cursor_pos < self.market_search_query.chars().count() {
+                                let byte_idx = self
+                                    .market_search_query
+                                    .char_indices()
+                                    .nth(self.cursor_pos)
+                                    .map(|(i, _)| i)
+                                    .unwrap();
+                                self.market_search_query.remove(byte_idx);
+                            }
+                        }
+                        SidebarCategory::Settings => {
+                            let setting = self
+                                .config
+                                .get_index(self.settings_selected)
+                                .map(|(k, _)| k.clone())
+                                .unwrap_or_default();
+
+                            if let Some(Value::String(s)) = self.config.get_mut(&setting) {
+                                if self.cursor_pos < s.chars().count() {
+                                    let byte_idx = s
+                                        .char_indices()
+                                        .nth(self.cursor_pos)
+                                        .map(|(i, _)| i)
+                                        .unwrap();
+                                    s.remove(byte_idx);
+                                }
+                            }
+                        }
+                        SidebarCategory::Search => {
+                            if self.cursor_pos < self.search_query.chars().count() {
+                                let byte_idx = self
+                                    .search_query
+                                    .char_indices()
+                                    .nth(self.cursor_pos)
+                                    .map(|(i, _)| i)
+                                    .unwrap();
+                                self.search_query.remove(byte_idx);
+                            }
+                        }
+                        SidebarCategory::FileTree => {
+                            let ask = serde_json::from_value(
+                                self.config
+                                    .get("Ask Before Delete")
+                                    .clone()
+                                    .unwrap_or(&serde_json::Value::Bool(true))
+                                    .clone(),
+                            )
+                            .unwrap_or(true);
+                            if ask {
+                                self.modal = Some(Modal::new(ModalType::DeleteFile));
+                            } else {
+                                ws.delete_file();
+                            }
+                        }
+                        _ => {}
+                    },
+                    Action::MoveLeft(shift, ctrl) => match self.sidebar_category {
+                        // TODO: Implement selection movement
+                        SidebarCategory::Search => {
+                            self.cursor_pos = self.cursor_pos.saturating_sub(1);
+                        }
+                        SidebarCategory::MarketPlace => {
+                            self.cursor_pos = self.cursor_pos.saturating_sub(1);
+                        }
+                        SidebarCategory::Settings => {
+                            self.cursor_pos = self.cursor_pos.saturating_sub(1);
+                        }
+                        _ => {}
+                    },
+                    Action::MoveRight(shift, ctrl) => match self.sidebar_category {
+                        // TODO: Implement selection movement
+                        SidebarCategory::Search => {
+                            if self.cursor_pos < self.search_query.len() {
+                                self.cursor_pos += 1;
+                            }
+                        }
+                        SidebarCategory::MarketPlace => {
+                            if self.cursor_pos < self.market_search_query.len() {
+                                self.cursor_pos += 1;
+                            }
+                        }
+                        SidebarCategory::Settings => {
+                            let setting = self
+                                .config
+                                .get_index(self.settings_selected)
+                                .and_then(|(_, v)| v.as_str())
+                                .unwrap_or_default()
+                                .to_string();
+
+                            if self.cursor_pos < setting.len() {
+                                self.cursor_pos += 1;
+                            }
+                        }
+                        _ => {}
+                    },
+                    Action::MoveUp(_) => {
+                        match self.sidebar_category {
+                            SidebarCategory::FileTree => {
+                                ws.selected = ws.selected.saturating_sub(1);
+                            }
+                            SidebarCategory::Search => {
+                                self.search_selected = self.search_selected.saturating_sub(1);
+                            }
+                            SidebarCategory::Git => {
+                                self.git_selected = self.git_selected.saturating_sub(1);
+                            }
+                            SidebarCategory::Settings => {
+                                self.settings_selected = self.settings_selected.saturating_sub(1)
+                            }
+                            SidebarCategory::MarketPlace => {
+                                self.marketplace_item_selected =
+                                    self.marketplace_item_selected.saturating_sub(1)
+                            }
+                        }
+                        self.cursor_pos = 0;
+                    }
+                    Action::MoveDown(_) => {
+                        match self.sidebar_category {
+                            SidebarCategory::FileTree => {
+                                let max = ws.flatten().len().saturating_sub(1);
+                                if ws.selected < max {
+                                    ws.selected += 1;
+                                }
+                            }
+                            SidebarCategory::Search => {
+                                if self.search_selected
+                                    < self.search_results.len().saturating_sub(1)
+                                {
+                                    self.search_selected += 1;
+                                }
+                            }
+                            SidebarCategory::Git => {
+                                if self.git_selected < self.git_changes.len().saturating_sub(1) {
+                                    self.git_selected += 1;
+                                }
+                            }
+                            SidebarCategory::Settings => {
+                                if self.settings_selected < self.config.len().saturating_sub(1) {
+                                    self.settings_selected += 1;
+                                }
+                            }
+                            SidebarCategory::MarketPlace => {
+                                if self.marketplace_item_selected
+                                    < self.marketplace_listed_items.len().saturating_sub(1)
+                                {
+                                    self.marketplace_item_selected += 1;
+                                }
+                            }
+                        }
+                        self.cursor_pos = 0;
+                    }
+                    Action::InsertNewline | Action::ModalConfirmForceNewTab => {
+                        match self.sidebar_category {
+                            SidebarCategory::FileTree => {
+                                let force_new = action == Action::ModalConfirmForceNewTab;
+                                let flat = ws.flatten();
+                                if ws.selected < flat.len() {
+                                    let node_idx = flat[ws.selected].0;
+                                    if ws.nodes[node_idx].is_dir {
+                                        if !force_new {
+                                            ws.toggle(node_idx);
+                                        }
+                                    } else {
+                                        file_to_open = Some(ws.nodes[node_idx].path.clone());
+                                        let current_is_dirty =
+                                            self.current_editor().map_or(false, |e| e.dirty);
+                                        open_in_new_tab = force_new || current_is_dirty;
+                                        close_focused = true;
+                                    }
+                                }
+                            }
+                            SidebarCategory::Search => {
+                                if self.search_selected < self.search_results.len() {
+                                    let result = &self.search_results[self.search_selected];
+                                    let path = result.filepath.clone();
+                                    let line = result.line_number;
+                                    self.dispatch(Action::FocusFile(path, Some(line)));
+                                    return;
+                                }
+                            }
+                            SidebarCategory::Git => {
+                                if self.git_selected < self.git_changes.len() {
+                                    self.dispatch(Action::OpenDiff(self.git_selected));
+                                    return;
+                                }
+                            }
+                            SidebarCategory::Settings => {
+                                if self.settings_selected < self.config.len() {
+                                    self.dispatch(Action::ChangeSettings);
+                                }
+                            }
+                            SidebarCategory::MarketPlace => {
+                                todo!(
+                                    "Implement choosing a marketplace item, and loading the README.md of it, or a \"no README.md found\" note :)\nIt should use termimad, and eventually our own implementation so we can build it up to other OSes more easiy, with a consistent background"
+                                )
+                            }
+                        }
+                    }
+                    Action::SwitchFocus => {
+                        close_focused = true;
+                    }
+                    Action::ToggleSidebar => {
+                        ws.visible = false;
+                        close_focused = true;
+                    }
+                    Action::Quit => self.should_quit = true,
+                    _ => {}
+                }
+            }
+
+            if let Some(path_str) = file_to_open {
+                self.open_file(&path_str, open_in_new_tab);
+            }
+
+            if close_focused {
+                if let Some(ws) = &mut self.workspace {
+                    ws.focused = false;
+                }
+            }
+            return;
+        }
+
+        // Actions that need access to the editors list (to avoid borrow conflicts)
+        match action {
+            Action::NextTab => {
+                if !self.editors.is_empty() {
+                    self.active_tab += 1;
+                    if self.active_tab >= self.editors.len() {
+                        self.active_tab = 0;
+                    }
+                }
+                return;
+            }
+            Action::PrevTab => {
+                if !self.editors.is_empty() {
+                    if self.active_tab == 0 {
+                        self.active_tab = self.editors.len().saturating_sub(1);
+                    } else {
+                        self.active_tab = self.active_tab.saturating_sub(1);
+                    }
+                }
+                return;
+            }
+            Action::Redo => {
+                todo!("Implement redoing")
+            }
+            Action::Undo => {
+                todo!("Implement undoing")
+            }
+            Action::CloseTab => {
+                if self.editors.is_empty() {
+                    return;
+                }
+
+                let current_dirty = self.editors[self.active_tab].dirty;
+                let is_new = self.editors[self.active_tab].filepath.is_none();
+
+                if current_dirty && !is_new {
+                    // For now, reuse QuitPrompt but it leads to quitting the app.
+                    // In a future refactor we might want to distinguish.
+                    // But the user's primary request is about the non-dirty last tab.
+                    self.modal = Some(Modal::new(ModalType::CloseTabPrompt));
+                } else {
+                    self.close_current_editor();
+                }
+                return;
+            }
+            Action::Quit => {
+                if self.editors.is_empty() {
+                    self.should_quit = true;
+                    return;
+                }
+
+                let mut any_dirty = false;
+                for e in &self.editors {
+                    if e.dirty {
+                        any_dirty = true;
+                        break;
+                    }
+                }
+
+                if any_dirty {
+                    if self.editors.len() > 1 {
+                        self.modal = Some(Modal::new(ModalType::ConfirmExit));
+                    } else {
+                        self.modal = Some(Modal::new(ModalType::QuitPrompt));
+                    }
+                } else {
+                    self.should_quit = true;
+                }
+                return;
+            }
+            _ => {}
+        }
+
+        // Route Global & Editor actions
+        match action {
+            Action::SwitchFocus => {
+                if let Some(ws) = &mut self.workspace {
+                    if ws.visible {
+                        ws.focused = true;
+                    }
+                }
+                return;
+            }
+            Action::ToggleSidebar => {
+                if let Some(ws) = &mut self.workspace {
+                    ws.visible = !ws.visible;
+                    if ws.visible {
+                        ws.focused = true;
+                    } else {
+                        ws.focused = false;
+                    }
+                }
+                return;
+            }
+            Action::OpenCommandPallete => {
+                self.modal = Some(Modal::new(ModalType::CommandPallete));
+                return;
+            }
+            Action::OpenSearch => {
+                self.modal = Some(Modal::new(ModalType::Search));
+                return;
+            }
+            Action::OpenReplace => {
+                self.modal = Some(Modal::new(ModalType::Replace));
+                return;
+            }
+            Action::OpenHelp => {
+                if self
+                    .modal
+                    .as_ref()
+                    .map_or(false, |m| m.modal_type == ModalType::Help)
+                {
+                    self.modal = None;
+                    self.dirty = true;
+                } else {
+                    self.modal = Some(Modal::new(ModalType::Help));
+                }
+                return;
+            }
+            Action::Save => {
+                self.save_current_file();
+                return;
+            }
+            _ => {}
+        }
+
+        let height = self.host_terminal_height.clone();
+
+        if let Some(editor) = self.current_editor_mut() {
+            match action {
+                Action::MoveUp(shift) => editor.move_up(shift),
+                Action::MoveDown(shift) => editor.move_down(shift),
+                Action::MoveLeft(shift, ctrl) => editor.move_left(shift, ctrl),
+                Action::MoveRight(shift, ctrl) => editor.move_right(shift, ctrl),
+
+                Action::Copy => editor.copy(),
+                Action::Cut => editor.cut(),
+                Action::Paste => editor.paste(),
+
+                Action::PageUp(shift) => {
+                    editor.update_selection(shift);
+                    for _ in 0..height {
+                        editor.move_up(shift);
+                    }
+                }
+                Action::PageDown(shift) => {
+                    editor.update_selection(shift);
+                    for _ in 0..height {
+                        editor.move_down(shift);
+                    }
+                }
+
+                Action::InsertChar(c) => {
+                    editor.insert_char(c);
+                    editor.dirty = true;
+                }
+                Action::InsertNewline => {
+                    editor.insert_newline();
+                    editor.dirty = true;
+                }
+                Action::DeleteChar => {
+                    editor.delete_char();
+                    editor.dirty = true;
+                }
+                Action::BackSpace => {
+                    editor.backspace_char();
+                    editor.dirty = true;
+                }
+                Action::Tab => {
+                    for _ in 0..tab_size {
+                        editor.insert_char(' ');
+                    }
+                    editor.dirty = true;
+                }
+                _ => {}
+            }
+        }
+    }
+
+    fn find_next_match(&mut self) {
+        // Extract and clone the search term to drop the immutable borrow of self
+        let search_term = match &self.modal {
+            Some(modal) if !modal.input.is_empty() => modal.input.clone(),
+            _ => return,
+        };
+
+        if let Some(editor) = self.current_editor_mut() {
+            let total_lines = editor.lines.len();
+            let start_y = editor.cursor_y;
+            let start_x = editor.cursor_x + 1;
+
+            for i in 0..total_lines {
+                let mut y = start_y + i;
+                y = if y >= total_lines { y - total_lines } else { y };
+                let line = &editor.lines[y];
+                let x_offset = if i == 0 { start_x } else { 0 };
+
+                if x_offset < line.len() {
+                    if let Some(match_x) = line[x_offset..].find(&search_term.to_string()) {
+                        editor.cursor_y = y;
+                        editor.cursor_x = x_offset + match_x;
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    fn replace_match(&mut self) {
+        let (search_term, replace_term) = if let Some(modal) = &self.modal {
+            (modal.input.clone(), modal.replace_input.clone())
+        } else {
+            return;
+        };
+
+        if search_term.is_empty() {
+            return;
+        }
+
+        if let Some(editor) = self.current_editor_mut() {
+            let line = editor.lines[editor.cursor_y].clone();
+            if editor.cursor_x + search_term.len() <= line.len() {
+                if &line[editor.cursor_x..editor.cursor_x + search_term.len()]
+                    == search_term.as_str()
+                {
+                    let mut new_line = line[..editor.cursor_x].to_string();
+                    new_line.push_str(&replace_term);
+                    new_line.push_str(&line[editor.cursor_x + search_term.len()..]);
+                    editor.lines[editor.cursor_y] = CompactString::from_string_buffer(new_line);
+                }
+            }
+        }
+    }
+
+    fn refresh_git(&mut self) {
+        self.git_changes = self.git_manager.get_changes();
+    }
+
+    fn save_current_file(&mut self) {
+        if let Some(editor) = self.current_editor_mut() {
+            if let Some(path) = &editor.filepath {
+                let content = editor.lines.join("\n");
+                if std::fs::write(path, content).is_ok() {
+                    editor.dirty = false;
+                }
+            }
+        }
+    }
+
+    fn validate_new_file(&mut self) {
+        if let Some(modal) = &mut self.modal {
+            if modal.modal_type == ModalType::NewFile {
+                let path_str = &modal.input;
+                if path_str.is_empty() {
+                    modal.error_message = None;
+                    return;
+                }
+                let root = if let Some(ws) = &self.workspace {
+                    &ws.nodes[ws.root].path
+                } else {
+                    &std::path::PathBuf::from(".")
+                };
+                let full_path = root.join(path_str);
+                if full_path.exists() {
+                    modal.error_message = Some(CompactString::from("File already exists!"));
+                } else {
+                    modal.error_message = None;
+                }
+            }
+        }
+    }
+
+    fn fill_ws_cache(&mut self) {
+        {
+            let cache = Arc::clone(&self.whitespace_cache);
+            let lines = self
+                .current_editor()
+                .map(|e| e.lines.clone())
+                .unwrap_or_default();
+            rayon::spawn(move || {
+                let result: Vec<usize> = lines
+                    .par_iter()
+                    .enumerate()
+                    .filter(|(_, line)| {
+                        line.chars().any(|c| {
+                            matches!(
+                                c,
+                                ' ' | '\t' | '\n' | '\r'
+                            | '\u{00A0}' // non-breaking space
+                            | '\u{2002}' // en space
+                            | '\u{2003}' // em space
+                            | '\u{2009}' // thin space
+                            | '\u{200A}' // hair space
+                            | '\u{202F}' // narrow no-break space
+                            | '\u{3000}' // ideographic space
+                            | '\u{000B}' // line tabulation
+                            | '\u{000C}' // form feed
+                            | '\u{0085}' // line feed
+                            | '\u{1680}' // ogham space mark
+                            | '\u{2000}' // en quad
+                            | '\u{2001}' // em quad
+                            | '\u{2004}' // three-per-em space
+                            | '\u{2005}' // four-per-em space
+                            | '\u{2006}' // six-per-em space
+                            | '\u{2007}' // figure space
+                            | '\u{2008}' // punctuation space
+                            | '\u{2028}' // line seperator
+                            | '\u{2029}' // paragraph space
+                            | '\u{205F}' // medium mathematical space
+                            )
+                        })
+                    })
+                    .map(|(i, _)| i)
+                    .collect();
+                let mut guard = cache.write();
+                *guard = result;
+            });
+        }
+    }
+
+    fn perform_search(&mut self) {
+        if self.search_query.is_empty() {
+            self.search_results.clear();
+            self.search_num_files = 0;
+            self.search_num_occurrences = 0;
+            return;
+        }
+
+        // TODO: Make this happen once when we need it
+        self.fill_ws_cache();
+
+        let ws_path = if let Some(ws) = &self.workspace {
+            ws.nodes[ws.root].path.clone()
+        } else {
+            return;
+        };
+
+        let mut results = vec![];
+        let mut files_found = HashSet::new();
+
+        use ignore::WalkBuilder;
+        let builder = WalkBuilder::new(ws_path);
+        let ac = AhoCorasick::new([&self.search_query]).unwrap();
+
+        for entry in builder.build().filter_map(|e| e.ok()) {
+            if entry.path().is_file() {
+                if let Ok(content) = std::fs::read_to_string(entry.path()) {
+                    let mut file_had_match = false;
+                    for (i, line) in content.lines().enumerate() {
+                        if ac.is_match(line) {
+                            results.push(SearchResult {
+                                filepath: entry.path().to_path_buf(),
+                                line_number: i + 1,
+                                content: CompactString::from(line.trim()),
+                            });
+                            file_had_match = true;
+                        }
+                    }
+                    if file_had_match {
+                        files_found.insert(entry.path().to_path_buf());
+                    }
+                }
+            }
+        }
+
+        self.search_num_occurrences = results.len();
+        self.search_num_files = files_found.len();
+        self.search_results = results;
+        self.search_selected = 0;
+        self.search_scroll = 0;
+    }
+}

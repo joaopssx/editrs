@@ -1,0 +1,25 @@
+## v0.3.0
+Remove GUI
+
+## v0.2.0
+<pre>Include extra optimizations
+Add settings sidebar
+Fix temrinal
+Add plugin support
+Force shift vs. caps lock differing at source level
+Improve visuals
+Add support for:
+ - Delete key
+ - Ctrl (+ shift) + Arrow
+Improve speed for changing current editor
+Add a GUI option
+Add a marketplace for plugins
+Add ZPT releases folder
+Add modified 2-clause BSD license</pre>
+
+## v0.1.0
+<pre>Fix bug where opening a file wouldn't pull up file tree
+Fix bug where when changing files in file tree, all paths would close
+Made paths absolute instead (internal)
+Use safer path over string (internal)
+Add Windows support</pre>

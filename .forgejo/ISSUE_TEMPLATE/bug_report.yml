@@ -1,0 +1,62 @@
+name: "Bug report"
+description: Report unintended behaviour within Sprig
+title: "Bug: "
+labels: ["bug"]
+body:
+  # The description
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug description
+      description: A description of what the bug is.
+      placeholder: What went wrong?
+    validations:
+      required: true
+
+  # How to make it happen
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Explain how you got the bug to occur.
+      placeholder: |
+        1. Open a tab
+        2. Type anything
+        3. Go to Git
+        4. Save
+
+  # Any extra stuff the user may have seen
+  - type: textarea
+    id: term_output
+    attributes:
+      label: Terminal output
+      description: Paste any errors you saw that might be relevant.
+      render: shell
+      placeholder: thread 'main' panicked at ....
+
+  # Which OS
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      description: What OS are you running sprig on?
+      # Sorted alphabetically
+      options:
+        - Windows
+        - MacOS
+        - Linux
+        - FreeBSD
+        - OpenBSD
+    validations:
+      required: true
+
+  # Just to make sure the user isn't reporting a fixed bug, or one that's already known :)
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklists
+      options:
+        - label: I found this bug in the latest version of Sprig.
+          required: true
+        - label: I checked for existing issues and didn't find a duplicate.
+          required: true
