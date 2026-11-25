@@ -17,7 +17,7 @@ editrs runs plugins written in Lua 5.5 (vendored through the `mlua` crate). Each
         main.lua    <- the plugin code
 ```
 
-The config folder is `%APPDATA%\editrs\` on Windows and `$USERPROFILE/.config/editrs/` elsewhere. Every folder inside `plugins/` is one plugin. A plugin whose `config` file or `src/main.lua` is missing is skipped. An empty `main.lua` is skipped too.
+The config folder is `%APPDATA%\editrs\` on Windows and `$XDG_CONFIG_HOME/editrs/` (or `~/.config/editrs/`) elsewhere. Every folder inside `plugins/` is one plugin. A plugin whose `config` file or `src/main.lua` is missing is skipped. An empty `main.lua` is skipped too.
 
 ## Lifecycle
 

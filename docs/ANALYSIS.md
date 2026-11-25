@@ -117,7 +117,7 @@ From reading the code (not profiled yet):
 
 Configuration:
 
-- Folder: `%APPDATA%\editrs` on Windows, `$USERPROFILE/.config/editrs` elsewhere (bug: `USERPROFILE` is normally unset on Linux and macOS, so `main` returns an error at startup).
+- Folder: `%APPDATA%\editrs` on Windows, `$XDG_CONFIG_HOME/editrs` or `$HOME/.config/editrs` elsewhere (`config::config_dir`). Before 0.2.0 it used `$USERPROFILE` outside Windows, which broke startup on Linux and macOS.
 - `config.jsonc` is created empty. Only its first line is read, as `#!<language name>`.
 - Every other setting comes from `config::default()` in code. `config/defaults.jsonc` describes a richer nested format but is never loaded.
 - Plugins can add and change settings at runtime (`settings.add/set`), stored in the same `IndexMap`.
@@ -133,7 +133,6 @@ Lua (details in `LUA_DOCS.md`):
 
 Bugs noted, not fixed in 0.1.0 (0.1.0 is identity only):
 
-- Config folder uses `$USERPROFILE` outside Windows (startup failure on Linux and macOS).
 - `input/caps_lock.rs` has `compile_error!` for macOS, FreeBSD, OpenBSD and NetBSD, so those targets do not build. `App::new` also hits `unreachable!` on other OSes.
 - `-v` prints the version but does not exit (`--version` does).
 - A path argument that does not exist panics (`canonicalize().unwrap()`).

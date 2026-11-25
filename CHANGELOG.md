@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- editrs now starts on Linux and macOS: the config folder comes from `$XDG_CONFIG_HOME` or `$HOME/.config` instead of `$USERPROFILE`.
+
 ## [0.1.0] - 2026-11-25
 
 ### Added

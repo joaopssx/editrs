@@ -8,7 +8,7 @@ Project identity, license, documentation, CI and code quality gates.
 
 ### Fixes first
 
-- Find the config folder correctly on Linux, macOS and FreeBSD (`$HOME`, XDG).
+- [x] Find the config folder correctly on Linux, macOS and FreeBSD (`$HOME`, XDG).
 - Build on macOS and FreeBSD (caps lock detection).
 - Make the Lua sandbox policy actually apply, and fix the plugin API bugs listed in `LUA_DOCS.md`.
 - Read `config.jsonc` instead of only its first line.

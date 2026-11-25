@@ -92,18 +92,16 @@ Existe um `flake.nix` (`nix build`, `nix run`), mas ele **não foi validado**. O
 | Plataforma | Situação |
 |---|---|
 | Windows x86_64 | Compila e roda (testado) |
-| Linux x86_64 | Compila no CI; veja o problema conhecido abaixo |
+| Linux x86_64 | Compila no CI |
 | macOS | Ainda não compila (detecção de Caps Lock não implementada) |
 | FreeBSD | Ainda não compila (mesmo motivo) |
-
-Problema conhecido: fora do Windows, o editrs procura a pasta de configuração em `$USERPROFILE`, variável que normalmente não existe no Linux, então ele falha ao iniciar a menos que você a defina (por exemplo `USERPROFILE=$HOME editrs`). Está planejado para a 0.2.0.
 
 ## Configuração
 
 O editrs guarda seus dados em:
 
 - Windows: `%APPDATA%\editrs\`
-- Outros sistemas: `$USERPROFILE/.config/editrs/`
+- Outros sistemas: `$XDG_CONFIG_HOME/editrs/`, ou `~/.config/editrs/` quando `XDG_CONFIG_HOME` não está definida
 
 Na primeira execução ele cria ali o `config.jsonc` e a pasta `plugins/`. Hoje só a primeira linha do `config.jsonc` é lida: uma linha `#!` que escolhe o idioma da interface. O resto usa os padrões internos.
 
