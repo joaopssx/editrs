@@ -12,7 +12,7 @@ editrs runs plugins written in Lua 5.5 (vendored through the `mlua` crate). Each
   config.jsonc
   plugins/
     my-plugin/
-      config        <- required (its content is passed as the plugin policy)
+      config        <- required: the plugin's permissions (JSON, may be empty)
       src/
         main.lua    <- the plugin code
 ```
@@ -27,9 +27,24 @@ The config folder is `%APPDATA%\editrs\` on Windows and `$XDG_CONFIG_HOME/editrs
 
 Each plugin has a memory limit of 10 MB.
 
-## Removed globals
+## Permissions
 
-The loader tries to set these standard globals to `nil` before the plugin runs (see the known issues below, this does not fully work yet): `package`, `debug`, `loadfile`, `collectgarbage`, `_VERSION`, `require`, `warn`, `assert`, `rawset`, `getmetatable`, `setmetatable`, `arg`.
+The plugin's `config` file is a JSON object of permissions. Every permission is off unless set to `true`. An empty file grants nothing; a file that is not a JSON object is reported in the debug console and also grants nothing.
+
+| Key | When `true` |
+|---|---|
+| `"unlimited io access"` | Keeps `dofile`, the whole `io` library and `os.execute`, `os.remove`, `os.rename`, `os.tmpname`, `os.exit`, `os.setlocale` |
+| `"stdout access"` | Keeps `io.stdout` |
+| `"stdin access"` | Keeps `io.stdin` |
+| `"make threads"` | Keeps `coroutine` |
+
+```json
+{ "make threads": true }
+```
+
+These globals are always removed: `package`, `debug`, `loadfile`, `collectgarbage`, `_VERSION`, `require`, `warn`, `assert`, `rawset`, `getmetatable`, `setmetatable`, `arg`.
+
+The `open(path)` function below can read any file the user can read, whatever the policy says. The sandbox is not a full security boundary yet: only install plugins you trust.
 
 ## API
 
@@ -111,8 +126,6 @@ end
 
 These are bugs in the current code, tracked for 0.2.0:
 
-- The plugin `config` file is passed as a plain string, so none of the policy options are actually read.
-- Some `io.*` removals use keys such as `"io.open"` as global names, which does not remove `io.open`. The standard libraries are also loaded after the removals, which can bring removed globals back.
 - `editor.get.char`, `editor.get.str` and `editor.get.cursor` use inverted or byte-based bounds checks and can return wrong results or crash editrs.
 - `editor.insert.cursor` uses the cursor column as the line index and the line as the column.
 - `run()` is called in a busy loop, so an idle plugin still uses CPU.

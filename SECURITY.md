@@ -12,4 +12,4 @@ Please do not open a public issue. Report it privately through GitHub's
 
 Include the editrs version, your OS, and steps to reproduce. You will get a reply as soon as possible.
 
-Note that the Lua plugin sandbox is not yet a security boundary (see `LUA_DOCS.md`). Only install plugins you trust.
+The Lua plugin sandbox limits file and process access, but it is not yet a full security boundary (see `LUA_DOCS.md`). Only install plugins you trust.

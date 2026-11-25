@@ -127,7 +127,7 @@ Lua (details in `LUA_DOCS.md`):
 - Plugins load only if `<config>/config` exists and `<config>/plugins/` is not empty. Each plugin folder needs `config` and `src/main.lua`.
 - Globals exposed: `print` (to the debug console), `key`, `open`, `settings`, `cursor`, `editor`.
 - Lifecycle: run script, call `init()` once, call `run()` forever.
-- Sandbox issues: the policy file is wrapped as a JSON string (`Value::from(String)`), so `policy.get(..)` always returns `None`; `globals.set("io.open", Nil)` sets a global literally named `io.open`; `load_std_libs(ALL_SAFE)` runs after the removals. The sandbox is not effective.
+- Sandbox: fixed in 0.2.0 (policy parsed as JSON, permissions checked the right way, `io`/`os` entries removed from their tables, standard libraries loaded once before the restrictions). Still open: the `open()` global ignores the policy.
 
 ## 6. Known limitations and technical debt
 
