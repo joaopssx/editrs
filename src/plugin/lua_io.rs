@@ -53,7 +53,7 @@ impl UserData for OpenFile {
             let mut line = String::new();
             reader.read_line(&mut line).map_err(Error::external)?;
             // advance the original file by the number of bytes read
-            let pos = reader.seek(SeekFrom::Current(0)).map_err(Error::external)?;
+            let pos = reader.stream_position().map_err(Error::external)?;
             f.seek(SeekFrom::Start(pos)).map_err(Error::external)?;
             Ok(line)
         });
@@ -72,7 +72,7 @@ impl UserData for OpenFile {
             let f = guard
                 .as_mut()
                 .ok_or_else(|| Error::external("file closed"))?;
-            let p = f.seek(SeekFrom::Current(0)).map_err(Error::external)?;
+            let p = f.stream_position().map_err(Error::external)?;
             Ok(p)
         });
 

@@ -121,7 +121,7 @@ impl GitManager {
         let full_path = std::path::Path::new(root).join(path);
         if let Ok(content) = std::fs::read_to_string(full_path) {
             diff_lines.push(GitDiffLine {
-                content: format!("--- /dev/null").into(),
+                content: "--- /dev/null".to_string().into(),
                 line_type: DiffLineType::Header,
             });
             diff_lines.push(GitDiffLine {
@@ -137,5 +137,11 @@ impl GitManager {
         }
 
         diff_lines
+    }
+}
+
+impl Default for GitManager {
+    fn default() -> Self {
+        Self::new()
     }
 }

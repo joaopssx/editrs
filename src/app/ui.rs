@@ -21,7 +21,7 @@ pub fn draw(f: &mut Frame, app: &App) {
     let status_area = outer_layout[1];
 
     // 2. Separate Sidebar and Editor Column
-    let sidebar_visible = app.workspace.as_ref().map_or(false, |ws| ws.visible);
+    let sidebar_visible = app.workspace.as_ref().is_some_and(|ws| ws.visible);
     let main_layout = if sidebar_visible {
         Layout::default()
             .direction(Direction::Horizontal)

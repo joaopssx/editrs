@@ -50,6 +50,8 @@ pub struct KeyCombo {
     padding: B4,
 }
 
+// Not wired in yet: keybinds are still hardcoded in `input::keymap`.
+#[allow(dead_code)]
 fn decode_binding(bind: &'static str) -> Option<(KeyCombo, Option<String>)> {
     let bind = bind.trim().to_lowercase();
     let parts: Vec<&str> = bind.split('+').collect();
@@ -190,7 +192,7 @@ fn decode_binding(bind: &'static str) -> Option<(KeyCombo, Option<String>)> {
             && !is_pgup
             && !is_tab)
     {
-        return None;
+        None
     } else {
         Some((
             KeyCombo::new()

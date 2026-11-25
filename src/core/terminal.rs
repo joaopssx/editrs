@@ -232,7 +232,7 @@ impl Terminal {
             }
         }
 
-        return any_new_data;
+        any_new_data
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) {

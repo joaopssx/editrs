@@ -14,10 +14,7 @@ fn set_line_at(
     insert_table.set(
         "line",
         lua.create_function(move |_lua, (line, contents): (usize, String)| {
-            let _ = tx.send(PluginAction::SetLine {
-                line,
-                contents: contents,
-            });
+            let _ = tx.send(PluginAction::SetLine { line, contents });
             Ok(())
         })?,
     )
@@ -34,7 +31,7 @@ fn set_str_at(
         "str",
         lua.create_function(
             move |_lua, (from, to, txt): (Vec<usize>, Vec<usize>, String)| {
-                let _ = tx.send(PluginAction::SetStrAt { from, to, txt: txt });
+                let _ = tx.send(PluginAction::SetStrAt { from, to, txt });
                 Ok(())
             },
         )?,
@@ -66,9 +63,9 @@ fn get_char_at(
                 responder_clone.signal.wait(&mut lock);
             }
 
-            let info = lock.clone();
-            if info.is_some() {
-                lua.to_value(&info.unwrap())
+            let info = *lock;
+            if let Some(info) = info {
+                lua.to_value(&info)
             } else {
                 lua.to_value(&mlua::Nil)
             }
@@ -104,8 +101,8 @@ fn get_str_at(
             }
 
             let info = lock.clone();
-            if info.is_some() {
-                lua.to_value(&info.unwrap().to_string())
+            if let Some(info) = info {
+                lua.to_value(&info.to_string())
             } else {
                 lua.to_value(&mlua::Nil)
             }
@@ -140,8 +137,8 @@ fn get_line(
             }
 
             let info = lock.clone();
-            if info.is_some() {
-                lua.to_value(&info.unwrap().to_string())
+            if let Some(info) = info {
+                lua.to_value(&info.to_string())
             } else {
                 lua.to_value(&mlua::Nil)
             }
@@ -175,7 +172,7 @@ fn insert_char_at(
     insert_table.set(
         "char",
         lua.create_function(move |_lua, (pos, txt): (Vec<usize>, String)| {
-            let _ = tx.send(PluginAction::InsertStrAt { pos, txt: txt });
+            let _ = tx.send(PluginAction::InsertStrAt { pos, txt });
             Ok(())
         })?,
     )
@@ -206,9 +203,9 @@ fn get_char_at_cursor(
                 responder_clone.signal.wait(&mut lock);
             }
 
-            let info = lock.clone();
-            if info.is_some() {
-                lua.to_value(&info.unwrap())
+            let info = *lock;
+            if let Some(info) = info {
+                lua.to_value(&info)
             } else {
                 lua.to_value(&mlua::Nil)
             }
@@ -242,7 +239,7 @@ fn insert_str_at_cursor(
     insert_table.set(
         "cursor",
         lua.create_function(move |_lua, txt: String| {
-            let _ = tx.send(PluginAction::InsertStrAtCursor { txt: txt });
+            let _ = tx.send(PluginAction::InsertStrAtCursor { txt });
             Ok(())
         })?,
     )
@@ -258,7 +255,7 @@ fn insert_str_at(
     insert_table.set(
         "str",
         lua.create_function(move |_lua, txt: String| {
-            let _ = tx.send(PluginAction::InsertStrAtCursor { txt: txt });
+            let _ = tx.send(PluginAction::InsertStrAtCursor { txt });
             Ok(())
         })?,
     )

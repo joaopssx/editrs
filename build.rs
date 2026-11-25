@@ -28,6 +28,10 @@ fn main() {
 
         let mut usage_code = String::from("{\n");
         for line in usage_raw.lines() {
+            if line.is_empty() {
+                usage_code.push_str("println!();\n");
+                continue;
+            }
             let escaped_line = line.replace('"', "\\\"");
             usage_code.push_str(&format!("println!(\"{}\");\n", escaped_line));
         }

@@ -152,14 +152,14 @@ pub fn draw_editor(f: &mut Frame, app: &App, area: Rect) {
         let mut match_starts: Vec<usize> = vec![];
         let match_len = search_term.as_ref().map(|s| s.chars().count()).unwrap_or(0);
 
-        if let Some(ref st) = search_term {
-            if !st.is_empty() {
-                for (byte_idx, _) in line.match_indices(st.as_str()) {
-                    let c_start = line[0..byte_idx].chars().count();
-                    match_starts.push(c_start);
-                    for c_off in 0..match_len {
-                        search_matches.push(c_start + c_off);
-                    }
+        if let Some(ref st) = search_term
+            && !st.is_empty()
+        {
+            for (byte_idx, _) in line.match_indices(st.as_str()) {
+                let c_start = line[0..byte_idx].chars().count();
+                match_starts.push(c_start);
+                for c_off in 0..match_len {
+                    search_matches.push(c_start + c_off);
                 }
             }
         }
@@ -241,7 +241,7 @@ pub fn draw_editor(f: &mut Frame, app: &App, area: Rect) {
         &mut scrollbar_state,
     );
 
-    let is_tree_focused = app.workspace.as_ref().map_or(false, |w| w.focused);
+    let is_tree_focused = app.workspace.as_ref().is_some_and(|w| w.focused);
 
     if !is_tree_focused {
         let cursor_x_visual = editor.cursor_x as u16 + 7 + area.x;

@@ -47,21 +47,13 @@ impl Editor {
                     ScopeStack::new(),
                 ),
             ]))),
-            clipboard: if let Some(clip_board) = Some(Clipboard::new()) {
-                if clip_board.is_ok() {
-                    Some(clip_board.unwrap())
-                } else {
-                    None
-                }
-            } else {
-                None
-            },
+            clipboard: Clipboard::new().ok(),
         }
     }
 
     pub fn load_file(&mut self, path: &Path) -> bool {
         if let Ok(content) = fs::read_to_string(path) {
-            self.lines = content.lines().map(|s| CompactString::from(s)).collect();
+            self.lines = content.lines().map(CompactString::from).collect();
             if self.lines.is_empty() {
                 self.lines.push(CompactString::default());
             }
@@ -678,10 +670,10 @@ impl Editor {
     }
 
     pub fn copy(&mut self) {
-        if let Some(text) = self.get_selected_text() {
-            if let Some(clipboard) = &mut self.clipboard {
-                let _ = clipboard.set_text(text);
-            }
+        if let Some(text) = self.get_selected_text()
+            && let Some(clipboard) = &mut self.clipboard
+        {
+            let _ = clipboard.set_text(text);
         }
     }
 
@@ -694,52 +686,63 @@ impl Editor {
     }
 
     pub fn paste(&mut self) {
-        if let Some(clipboard) = &mut self.clipboard {
-            if let Ok(text) = clipboard.get_text() {
-                // If we have a selection, delete it first so we "replace" it
-                self.delete_selection();
+        if let Some(clipboard) = &mut self.clipboard
+            && let Ok(text) = clipboard.get_text()
+        {
+            // If we have a selection, delete it first so we "replace" it
+            self.delete_selection();
 
-                let paste_lines: Vec<&str> = text.split('\n').collect();
+            let paste_lines: Vec<&str> = text.split('\n').collect();
 
-                if paste_lines.is_empty() {
-                    return;
-                }
-
-                if paste_lines.len() == 1 {
-                    // Simple single line paste
-                    let idx = Self::char_to_byte_idx(&self.lines[self.cursor_y], self.cursor_x);
-                    self.lines[self.cursor_y].insert_str(idx, paste_lines[0]);
-                    self.cursor_x += paste_lines[0].chars().count();
-                } else {
-                    // Multi-line paste
-                    let idx = Self::char_to_byte_idx(&self.lines[self.cursor_y], self.cursor_x);
-
-                    // Split the current line at cursor
-                    let current_line_suffix = self.lines[self.cursor_y].split_off(idx);
-
-                    // Add the first part of the paste to the current line
-                    self.lines[self.cursor_y].push_str(paste_lines[0]);
-
-                    // Insert middle lines
-                    for i in 1..paste_lines.len() - 1 {
-                        self.lines
-                            .insert(self.cursor_y + i, CompactString::from(paste_lines[i]));
-                    }
-
-                    // Handle the last line of the paste
-                    let last_paste_line = paste_lines.last().unwrap();
-                    let mut new_last_line = CompactString::from(*last_paste_line);
-                    let final_cursor_x = new_last_line.chars().count();
-                    new_last_line.push_str(&current_line_suffix);
-
-                    self.cursor_y += paste_lines.len() - 1;
-                    self.lines.insert(self.cursor_y, new_last_line);
-                    self.cursor_x = final_cursor_x;
-                }
-
-                self.target_x = self.cursor_x;
-                self.dirty = true;
+            if paste_lines.is_empty() {
+                return;
             }
+
+            if paste_lines.len() == 1 {
+                // Simple single line paste
+                let idx = Self::char_to_byte_idx(&self.lines[self.cursor_y], self.cursor_x);
+                self.lines[self.cursor_y].insert_str(idx, paste_lines[0]);
+                self.cursor_x += paste_lines[0].chars().count();
+            } else {
+                // Multi-line paste
+                let idx = Self::char_to_byte_idx(&self.lines[self.cursor_y], self.cursor_x);
+
+                // Split the current line at cursor
+                let current_line_suffix = self.lines[self.cursor_y].split_off(idx);
+
+                // Add the first part of the paste to the current line
+                self.lines[self.cursor_y].push_str(paste_lines[0]);
+
+                // Insert middle lines
+                for (i, line) in paste_lines
+                    .iter()
+                    .enumerate()
+                    .take(paste_lines.len() - 1)
+                    .skip(1)
+                {
+                    self.lines
+                        .insert(self.cursor_y + i, CompactString::from(*line));
+                }
+
+                // Handle the last line of the paste
+                let last_paste_line = paste_lines.last().unwrap();
+                let mut new_last_line = CompactString::from(*last_paste_line);
+                let final_cursor_x = new_last_line.chars().count();
+                new_last_line.push_str(&current_line_suffix);
+
+                self.cursor_y += paste_lines.len() - 1;
+                self.lines.insert(self.cursor_y, new_last_line);
+                self.cursor_x = final_cursor_x;
+            }
+
+            self.target_x = self.cursor_x;
+            self.dirty = true;
         }
+    }
+}
+
+impl Default for Editor {
+    fn default() -> Self {
+        Self::new()
     }
 }

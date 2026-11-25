@@ -209,7 +209,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     if path.exists() {
         if path.join("config").exists() {
-            if fs::read_dir(&path.join("plugins"))
+            if fs::read_dir(path.join("plugins"))
                 .map(|mut entries| entries.next().is_some()) // Check if at least one file exists
                 .unwrap_or(false)
             {
@@ -229,16 +229,16 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .num_threads(2)
                 .build_global()
                 .unwrap();
-            fs::create_dir_all(&path.join("plugins"))?;
+            fs::create_dir_all(path.join("plugins"))?;
             drop(plugin_tx);
         }
     } else {
-        fs::create_dir_all(&path.join("plugins"))?;
+        fs::create_dir_all(path.join("plugins"))?;
         drop(plugin_tx);
     }
 
-    if !fs::exists(&path.join("config.jsonc")).unwrap_or(false) {
-        fs::File::create(&path.join("config.jsonc"))?;
+    if !fs::exists(path.join("config.jsonc")).unwrap_or(false) {
+        fs::File::create(path.join("config.jsonc"))?;
     }
 
     execute!(std::io::stdout(), EnableFocusChange)?;

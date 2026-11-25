@@ -234,7 +234,7 @@ fn draw_file_tree(
 }
 
 fn draw_search_view(f: &mut Frame, app: &App, area: Rect) {
-    let is_focused = app.workspace.as_ref().map_or(false, |w| w.focused);
+    let is_focused = app.workspace.as_ref().is_some_and(|w| w.focused);
     let active_style = if is_focused {
         Style::default()
             .fg(Color::Yellow)
@@ -321,7 +321,7 @@ fn draw_search_view(f: &mut Frame, app: &App, area: Rect) {
 
         lines.push(Line::from(Span::styled(
             format!(" {}:{} ", filename, result.line_number),
-            style.clone().fg(Color::Cyan),
+            style.fg(Color::Cyan),
         )));
         lines.push(Line::from(Span::styled(
             format!("   {}", result.content),
@@ -342,7 +342,7 @@ fn draw_search_view(f: &mut Frame, app: &App, area: Rect) {
 }
 
 fn draw_git_view(f: &mut Frame, app: &App, area: Rect) {
-    let is_focused = app.workspace.as_ref().map_or(false, |w| w.focused);
+    let is_focused = app.workspace.as_ref().is_some_and(|w| w.focused);
     let active_style = if is_focused {
         Style::default()
             .fg(Color::Yellow)
@@ -404,11 +404,7 @@ fn draw_git_view(f: &mut Frame, app: &App, area: Rect) {
     }
 
     let height = area.height as usize;
-    let scroll_y = if app.git_selected >= height / 2 {
-        app.git_selected - height / 2
-    } else {
-        0
-    };
+    let scroll_y = app.git_selected.saturating_sub(height / 2);
 
     let p = Paragraph::new(lines)
         .block(block)
@@ -424,11 +420,11 @@ fn draw_settings_view(
     app: &App,
     area: Rect,
     active_bg_color: Color,
-    inactive_bg_color: Color,
+    _inactive_bg_color: Color,
     active_fg_color: Color,
     inactive_fg_color: Color,
 ) {
-    let is_focused = app.workspace.as_ref().map_or(false, |w| w.focused);
+    let is_focused = app.workspace.as_ref().is_some_and(|w| w.focused);
     let active_style = if is_focused {
         Style::default()
             .fg(active_bg_color)
@@ -526,7 +522,7 @@ fn draw_settings_view(
 fn draw_marketplace_view(f: &mut Frame, app: &App, area: Rect) {
     // TODO: Implement X scrolling when hovering on a plugin with a description
     //       longer than current view
-    let is_focused = app.workspace.as_ref().map_or(false, |w| w.focused);
+    let is_focused = app.workspace.as_ref().is_some_and(|w| w.focused);
     let active_style = if is_focused {
         Style::default()
             .fg(Color::Yellow)
@@ -624,7 +620,7 @@ fn draw_marketplace_view(f: &mut Frame, app: &App, area: Rect) {
 
         lines.push(Line::from(Span::styled(
             format!(" {} ", title),
-            style.clone().fg(Color::Cyan),
+            style.fg(Color::Cyan),
         )));
         lines.push(Line::from(Span::styled(
             format!(" {} ", result.desc.chars().take(5).collect::<String>()),

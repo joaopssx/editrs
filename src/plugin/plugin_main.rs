@@ -62,12 +62,12 @@ fn spawn_lua_worker(
 
             let run_fn: Option<mlua::Function> = lua.globals().get("run").ok();
             loop {
-                if let Some(ref f) = run_fn {
-                    if let Err(e) = f.call::<()>(()) {
-                        let _ = action_tx.send(PluginAction::DebugLog {
-                            message: e.to_string(),
-                        });
-                    }
+                if let Some(ref f) = run_fn
+                    && let Err(e) = f.call::<()>(())
+                {
+                    let _ = action_tx.send(PluginAction::DebugLog {
+                        message: e.to_string(),
+                    });
                 }
 
                 // Check if it did anything

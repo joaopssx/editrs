@@ -75,7 +75,7 @@ pub fn map_key(key: KeyEvent, in_modal: bool, is_sidebar_focused: bool) -> Optio
                 // check for lower case in the future to tell if it
                 // is shift (in rare cases)
                 c = if shift && !caps_lock {
-                    c.to_uppercase().next().take().unwrap()
+                    c.to_uppercase().next().unwrap()
                 } else {
                     c
                 };

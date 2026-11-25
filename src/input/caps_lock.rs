@@ -1,5 +1,3 @@
-use std::fs;
-
 #[cfg(target_os = "linux")]
 pub fn is_caps_lock_on() -> bool {
     use glob::glob;

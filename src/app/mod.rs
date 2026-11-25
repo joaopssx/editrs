@@ -32,6 +32,9 @@ pub mod marketplace;
 /// shows an "unavailable" message.
 const MARKETPLACE_URL: Option<&str> = None;
 
+/// Whether the marketplace is reachable, and the plugin list or an error message.
+pub type MarketState = (bool, Result<Vec<MarketplacePlugin>, String>);
+
 pub struct SearchResult {
     pub filepath: PathBuf,
     pub line_number: usize,
@@ -77,13 +80,13 @@ pub struct App {
     pub marketplace_item_selected: usize,    // Number of selected item
     pub marketplace_plugins: Vec<MarketplacePlugin>, // Title and description of every plugin
     pub marketplace_error: Option<String>,   // The error (if any) from reqwest
-    pub market_state: Arc<RwLock<(bool, Result<Vec<MarketplacePlugin>, String>)>>, // The state of the maket
-    pub market_search_query: CompactString,                                        // Plugin search
+    pub market_state: Arc<RwLock<MarketState>>, // The state of the maket
+    pub market_search_query: CompactString,  // Plugin search
     pub marketplace_listed_items: Vec<MarketplacePlugin>, // Every marketplace item listed
-    pub online: bool,                                     // Whether the user has internet or not
-    pub cursor_pos: usize,                                // Curosor position for use in sidebar
-    pub resized: bool,                                    // Whether the terminal has been resized
-    pub commands: Vec<&'static str>,                      // Commands, and what to do
+    pub online: bool,                        // Whether the user has internet or not
+    pub cursor_pos: usize,                   // Curosor position for use in sidebar
+    pub resized: bool,                       // Whether the terminal has been resized
+    pub commands: Vec<&'static str>,         // Commands, and what to do
     pub plugin_commands: Vec<(String, mlua::Function)>, // Funcitons provided by plugins for commands to run
     pub translations: HashMap<WorldStrings, &'static str>, // Translations of every piece of text (excluding plugins)
 }
@@ -201,7 +204,7 @@ impl App {
                 let linux_name = linux_name
                     .lines()
                     .find(|line| line.starts_with("NAME="))
-                    .and_then(|line| line.splitn(2, '=').nth(1))
+                    .and_then(|line| line.split_once('=').map(|x| x.1))
                     .map(|value| value.trim_matches('"'))
                     .unwrap();
                 match linux_name {
@@ -404,7 +407,7 @@ impl App {
         } else {
             let mut editor = Editor::new();
             if editor.load_file(path) {
-                let current_is_dirty = self.current_editor().map_or(false, |e| e.dirty);
+                let current_is_dirty = self.current_editor().is_some_and(|e| e.dirty);
                 if force_new_tab
                     || (self.editors.is_empty())
                     || (self.editors.len() == 1 && current_is_dirty)
@@ -500,7 +503,7 @@ impl App {
                         self.plugin_commands
                             .iter()
                             .position(|command_name| command_name.0 == name)
-                            .and_then(|pos| Some(self.plugin_commands.remove(pos)));
+                            .map(|pos| self.plugin_commands.remove(pos));
                     }
                     PluginAction::MakeSetting { name, value } => {
                         self.config.insert(name, json!(value));
@@ -664,10 +667,10 @@ impl App {
                         }
                     }
                     PluginAction::InsertStrAt { pos, txt } => {
-                        if let Some(editor) = self.current_editor_mut() {
-                            if pos[0] <= editor.lines.len() {
-                                editor.lines[pos[0]].insert_str(pos[1], &txt);
-                            }
+                        if let Some(editor) = self.current_editor_mut()
+                            && pos[0] <= editor.lines.len()
+                        {
+                            editor.lines[pos[0]].insert_str(pos[1], &txt);
                         }
                     }
                     PluginAction::GetCharAtCursor { responder } => {
@@ -693,42 +696,42 @@ impl App {
                         }
                     }
                     PluginAction::InsertCharAt { pos, c } => {
-                        if let Some(editor) = self.current_editor_mut() {
-                            if let Some(line) = editor.lines.get_mut(pos[1]) {
-                                line.insert(pos[0], c);
-                            }
+                        if let Some(editor) = self.current_editor_mut()
+                            && let Some(line) = editor.lines.get_mut(pos[1])
+                        {
+                            line.insert(pos[0], c);
                         }
                     }
                     PluginAction::InsertCharAtCursor { c } => {
-                        if let Some(editor) = self.current_editor_mut() {
-                            if let Some(line) = editor.lines.get_mut(editor.cursor_y) {
-                                line.insert(editor.cursor_x, c);
-                            }
+                        if let Some(editor) = self.current_editor_mut()
+                            && let Some(line) = editor.lines.get_mut(editor.cursor_y)
+                        {
+                            line.insert(editor.cursor_x, c);
                         }
                     }
                     PluginAction::SetCharAt { pos, c } => {
-                        if let Some(editor) = self.current_editor_mut() {
-                            if let Some(line) = editor.lines.get_mut(pos[1]) {
-                                // Find the byte range of the character at the given visual index
-                                let target_char = line.char_indices().nth(pos[0]);
+                        if let Some(editor) = self.current_editor_mut()
+                            && let Some(line) = editor.lines.get_mut(pos[1])
+                        {
+                            // Find the byte range of the character at the given visual index
+                            let target_char = line.char_indices().nth(pos[0]);
 
-                                if let Some((idx, old_char)) = target_char {
-                                    // CompactString supports replace_range like a normal String
-                                    let end_idx = idx + old_char.len_utf8();
-                                    line.replace_range(idx..end_idx, &c.to_string());
-                                }
+                            if let Some((idx, old_char)) = target_char {
+                                // CompactString supports replace_range like a normal String
+                                let end_idx = idx + old_char.len_utf8();
+                                line.replace_range(idx..end_idx, &c.to_string());
                             }
                         }
                     }
                     PluginAction::SetCharAtCursor { c } => {
-                        if let Some(editor) = self.current_editor_mut() {
-                            if let Some(line) = editor.lines.get_mut(editor.cursor_y) {
-                                let target_char = line.char_indices().nth(editor.cursor_x);
+                        if let Some(editor) = self.current_editor_mut()
+                            && let Some(line) = editor.lines.get_mut(editor.cursor_y)
+                        {
+                            let target_char = line.char_indices().nth(editor.cursor_x);
 
-                                if let Some((idx, old_char)) = target_char {
-                                    let end_idx = idx + old_char.len_utf8();
-                                    line.replace_range(idx..end_idx, &c.to_string());
-                                }
+                            if let Some((idx, old_char)) = target_char {
+                                let end_idx = idx + old_char.len_utf8();
+                                line.replace_range(idx..end_idx, &c.to_string());
                             }
                         }
                     }
@@ -793,7 +796,7 @@ impl App {
         }
 
         let in_modal = self.modal.is_some();
-        let is_tree_focused = self.workspace.as_ref().map_or(false, |w| w.focused);
+        let is_tree_focused = self.workspace.as_ref().is_some_and(|w| w.focused);
         if let Some(action) = keymap::map_key(key, in_modal, is_tree_focused) {
             self.dispatch(action);
         }
@@ -822,24 +825,21 @@ impl App {
                 Action::ModalInsert(c) => {
                     modal.insert_char(c);
                     self.cursor_pos += 1;
-                    match modal.modal_type {
-                        ModalType::NewFile => self.validate_new_file(),
-                        _ => {}
+                    if modal.modal_type == ModalType::NewFile {
+                        self.validate_new_file()
                     }
                 }
                 Action::ModalBackspace => {
                     self.cursor_pos = self.cursor_pos.saturating_sub(1);
                     modal.remove_char(self.cursor_pos);
-                    match modal.modal_type {
-                        ModalType::NewFile => self.validate_new_file(),
-                        _ => {}
+                    if modal.modal_type == ModalType::NewFile {
+                        self.validate_new_file()
                     }
                 }
                 Action::ModalDelete => {
                     modal.remove_char(self.cursor_pos);
-                    match modal.modal_type {
-                        ModalType::NewFile => self.validate_new_file(),
-                        _ => {}
+                    if modal.modal_type == ModalType::NewFile {
+                        self.validate_new_file()
                     }
                 }
                 Action::ModalTab => match modal.modal_type {
@@ -880,10 +880,8 @@ impl App {
                             }
                         }
                     }
-                    ModalType::ConfirmExit => {
-                        if modal.active_button < 1 {
-                            modal.active_button += 1;
-                        }
+                    ModalType::ConfirmExit if modal.active_button < 1 => {
+                        modal.active_button += 1;
                     }
                     _ => {}
                 },
@@ -899,10 +897,8 @@ impl App {
                             modal.active_button += 1;
                         }
                     }
-                    ModalType::DeleteFile => {
-                        if modal.active_button < 1 {
-                            modal.active_button += 1;
-                        }
+                    ModalType::DeleteFile if modal.active_button < 1 => {
+                        modal.active_button += 1;
                     }
                     _ => {}
                 },
@@ -987,13 +983,13 @@ impl App {
                                 2 => {
                                     // Save
                                     let mut saved = false;
-                                    if let Some(editor) = self.current_editor_mut() {
-                                        if let Some(path) = &editor.filepath {
-                                            let content = editor.lines.join("\n");
-                                            if std::fs::write(path, content).is_ok() {
-                                                editor.dirty = false;
-                                                saved = true;
-                                            }
+                                    if let Some(editor) = self.current_editor_mut()
+                                        && let Some(path) = &editor.filepath
+                                    {
+                                        let content = editor.lines.join("\n");
+                                        if std::fs::write(path, content).is_ok() {
+                                            editor.dirty = false;
+                                            saved = true;
                                         }
                                     }
                                     if saved {
@@ -1020,7 +1016,7 @@ impl App {
                                     let _ = std::fs::create_dir_all(parent);
                                 }
 
-                                if let Ok(_) = std::fs::write(&full_path, "") {
+                                if std::fs::write(&full_path, "").is_ok() {
                                     self.modal = None;
                                     self.open_file(&full_path, true);
                                 }
@@ -1112,11 +1108,11 @@ impl App {
             }
             Action::FocusFile(path, line) => {
                 self.open_file(&path, false);
-                if let Some(line_num) = line {
-                    if let Some(editor) = self.current_editor_mut() {
-                        editor.cursor_y = line_num.saturating_sub(1);
-                        editor.cursor_x = 0;
-                    }
+                if let Some(line_num) = line
+                    && let Some(editor) = self.current_editor_mut()
+                {
+                    editor.cursor_y = line_num.saturating_sub(1);
+                    editor.cursor_x = 0;
                 }
                 if let Some(ws) = &mut self.workspace {
                     ws.focused = false;
@@ -1124,7 +1120,7 @@ impl App {
                 return;
             }
             Action::SearchFiles(query) => {
-                self.search_query = query.into();
+                self.search_query = query;
                 self.perform_search();
                 return;
             }
@@ -1162,7 +1158,7 @@ impl App {
             .and_then(|v| v.as_u64())
             .unwrap_or(4);
 
-        let is_tree_focused = self.workspace.as_ref().map_or(false, |w| w.focused);
+        let is_tree_focused = self.workspace.as_ref().is_some_and(|w| w.focused);
         if is_tree_focused {
             let mut close_focused = false;
             let mut file_to_open: Option<PathBuf> = None;
@@ -1199,7 +1195,7 @@ impl App {
                     Action::BackSpace => {
                         match self.sidebar_category {
                             SidebarCategory::Search => {
-                                if self.cursor_pos > 0 && self.search_query.len() > 0 {
+                                if self.cursor_pos > 0 && !self.search_query.is_empty() {
                                     let byte_idx = self
                                         .search_query
                                         .char_indices()
@@ -1211,7 +1207,7 @@ impl App {
                                 self.perform_search();
                             }
                             SidebarCategory::MarketPlace => {
-                                if self.cursor_pos > 0 && self.market_search_query.len() > 0 {
+                                if self.cursor_pos > 0 && !self.market_search_query.is_empty() {
                                     let byte_idx = self
                                         .market_search_query
                                         .char_indices()
@@ -1228,15 +1224,15 @@ impl App {
                                     .map(|(k, _)| k.clone())
                                     .unwrap_or_default();
 
-                                if let Some(Value::String(s)) = self.config.get_mut(&setting) {
-                                    if self.cursor_pos != 0 {
-                                        let byte_idx = s
-                                            .char_indices()
-                                            .nth(self.cursor_pos.saturating_sub(1))
-                                            .map(|(i, _)| i)
-                                            .unwrap();
-                                        s.remove(byte_idx);
-                                    }
+                                if let Some(Value::String(s)) = self.config.get_mut(&setting)
+                                    && self.cursor_pos != 0
+                                {
+                                    let byte_idx = s
+                                        .char_indices()
+                                        .nth(self.cursor_pos.saturating_sub(1))
+                                        .map(|(i, _)| i)
+                                        .unwrap();
+                                    s.remove(byte_idx);
                                 }
                             }
                             _ => {}
@@ -1262,15 +1258,15 @@ impl App {
                                 .map(|(k, _)| k.clone())
                                 .unwrap_or_default();
 
-                            if let Some(Value::String(s)) = self.config.get_mut(&setting) {
-                                if self.cursor_pos < s.chars().count() {
-                                    let byte_idx = s
-                                        .char_indices()
-                                        .nth(self.cursor_pos)
-                                        .map(|(i, _)| i)
-                                        .unwrap();
-                                    s.remove(byte_idx);
-                                }
+                            if let Some(Value::String(s)) = self.config.get_mut(&setting)
+                                && self.cursor_pos < s.chars().count()
+                            {
+                                let byte_idx = s
+                                    .char_indices()
+                                    .nth(self.cursor_pos)
+                                    .map(|(i, _)| i)
+                                    .unwrap();
+                                s.remove(byte_idx);
                             }
                         }
                         SidebarCategory::Search => {
@@ -1288,7 +1284,6 @@ impl App {
                             let ask = serde_json::from_value(
                                 self.config
                                     .get("Ask Before Delete")
-                                    .clone()
                                     .unwrap_or(&serde_json::Value::Bool(true))
                                     .clone(),
                             )
@@ -1301,7 +1296,7 @@ impl App {
                         }
                         _ => {}
                     },
-                    Action::MoveLeft(shift, ctrl) => match self.sidebar_category {
+                    Action::MoveLeft(_shift, _ctrl) => match self.sidebar_category {
                         // TODO: Implement selection movement
                         SidebarCategory::Search => {
                             self.cursor_pos = self.cursor_pos.saturating_sub(1);
@@ -1314,7 +1309,7 @@ impl App {
                         }
                         _ => {}
                     },
-                    Action::MoveRight(shift, ctrl) => match self.sidebar_category {
+                    Action::MoveRight(_shift, _ctrl) => match self.sidebar_category {
                         // TODO: Implement selection movement
                         SidebarCategory::Search => {
                             if self.cursor_pos < self.search_query.len() {
@@ -1410,7 +1405,7 @@ impl App {
                                     } else {
                                         file_to_open = Some(ws.nodes[node_idx].path.clone());
                                         let current_is_dirty =
-                                            self.current_editor().map_or(false, |e| e.dirty);
+                                            self.current_editor().is_some_and(|e| e.dirty);
                                         open_in_new_tab = force_new || current_is_dirty;
                                         close_focused = true;
                                     }
@@ -1459,10 +1454,8 @@ impl App {
                 self.open_file(&path_str, open_in_new_tab);
             }
 
-            if close_focused {
-                if let Some(ws) = &mut self.workspace {
-                    ws.focused = false;
-                }
+            if close_focused && let Some(ws) = &mut self.workspace {
+                ws.focused = false;
             }
             return;
         }
@@ -1543,21 +1536,17 @@ impl App {
         // Route Global & Editor actions
         match action {
             Action::SwitchFocus => {
-                if let Some(ws) = &mut self.workspace {
-                    if ws.visible {
-                        ws.focused = true;
-                    }
+                if let Some(ws) = &mut self.workspace
+                    && ws.visible
+                {
+                    ws.focused = true;
                 }
                 return;
             }
             Action::ToggleSidebar => {
                 if let Some(ws) = &mut self.workspace {
                     ws.visible = !ws.visible;
-                    if ws.visible {
-                        ws.focused = true;
-                    } else {
-                        ws.focused = false;
-                    }
+                    ws.focused = ws.visible;
                 }
                 return;
             }
@@ -1577,7 +1566,7 @@ impl App {
                 if self
                     .modal
                     .as_ref()
-                    .map_or(false, |m| m.modal_type == ModalType::Help)
+                    .is_some_and(|m| m.modal_type == ModalType::Help)
                 {
                     self.modal = None;
                     self.dirty = true;
@@ -1593,7 +1582,7 @@ impl App {
             _ => {}
         }
 
-        let height = self.host_terminal_height.clone();
+        let height = self.host_terminal_height;
 
         if let Some(editor) = self.current_editor_mut() {
             match action {
@@ -1664,12 +1653,12 @@ impl App {
                 let line = &editor.lines[y];
                 let x_offset = if i == 0 { start_x } else { 0 };
 
-                if x_offset < line.len() {
-                    if let Some(match_x) = line[x_offset..].find(&search_term.to_string()) {
-                        editor.cursor_y = y;
-                        editor.cursor_x = x_offset + match_x;
-                        return;
-                    }
+                if x_offset < line.len()
+                    && let Some(match_x) = line[x_offset..].find(&search_term.to_string())
+                {
+                    editor.cursor_y = y;
+                    editor.cursor_x = x_offset + match_x;
+                    return;
                 }
             }
         }
@@ -1688,15 +1677,14 @@ impl App {
 
         if let Some(editor) = self.current_editor_mut() {
             let line = editor.lines[editor.cursor_y].clone();
-            if editor.cursor_x + search_term.len() <= line.len() {
-                if &line[editor.cursor_x..editor.cursor_x + search_term.len()]
+            if editor.cursor_x + search_term.len() <= line.len()
+                && &line[editor.cursor_x..editor.cursor_x + search_term.len()]
                     == search_term.as_str()
-                {
-                    let mut new_line = line[..editor.cursor_x].to_string();
-                    new_line.push_str(&replace_term);
-                    new_line.push_str(&line[editor.cursor_x + search_term.len()..]);
-                    editor.lines[editor.cursor_y] = CompactString::from_string_buffer(new_line);
-                }
+            {
+                let mut new_line = line[..editor.cursor_x].to_string();
+                new_line.push_str(&replace_term);
+                new_line.push_str(&line[editor.cursor_x + search_term.len()..]);
+                editor.lines[editor.cursor_y] = CompactString::from_string_buffer(new_line);
             }
         }
     }
@@ -1706,35 +1694,35 @@ impl App {
     }
 
     fn save_current_file(&mut self) {
-        if let Some(editor) = self.current_editor_mut() {
-            if let Some(path) = &editor.filepath {
-                let content = editor.lines.join("\n");
-                if std::fs::write(path, content).is_ok() {
-                    editor.dirty = false;
-                }
+        if let Some(editor) = self.current_editor_mut()
+            && let Some(path) = &editor.filepath
+        {
+            let content = editor.lines.join("\n");
+            if std::fs::write(path, content).is_ok() {
+                editor.dirty = false;
             }
         }
     }
 
     fn validate_new_file(&mut self) {
-        if let Some(modal) = &mut self.modal {
-            if modal.modal_type == ModalType::NewFile {
-                let path_str = &modal.input;
-                if path_str.is_empty() {
-                    modal.error_message = None;
-                    return;
-                }
-                let root = if let Some(ws) = &self.workspace {
-                    &ws.nodes[ws.root].path
-                } else {
-                    &std::path::PathBuf::from(".")
-                };
-                let full_path = root.join(path_str);
-                if full_path.exists() {
-                    modal.error_message = Some(CompactString::from("File already exists!"));
-                } else {
-                    modal.error_message = None;
-                }
+        if let Some(modal) = &mut self.modal
+            && modal.modal_type == ModalType::NewFile
+        {
+            let path_str = &modal.input;
+            if path_str.is_empty() {
+                modal.error_message = None;
+                return;
+            }
+            let root = if let Some(ws) = &self.workspace {
+                &ws.nodes[ws.root].path
+            } else {
+                &std::path::PathBuf::from(".")
+            };
+            let full_path = root.join(path_str);
+            if full_path.exists() {
+                modal.error_message = Some(CompactString::from("File already exists!"));
+            } else {
+                modal.error_message = None;
             }
         }
     }
@@ -1812,22 +1800,22 @@ impl App {
         let ac = AhoCorasick::new([&self.search_query]).unwrap();
 
         for entry in builder.build().filter_map(|e| e.ok()) {
-            if entry.path().is_file() {
-                if let Ok(content) = std::fs::read_to_string(entry.path()) {
-                    let mut file_had_match = false;
-                    for (i, line) in content.lines().enumerate() {
-                        if ac.is_match(line) {
-                            results.push(SearchResult {
-                                filepath: entry.path().to_path_buf(),
-                                line_number: i + 1,
-                                content: CompactString::from(line.trim()),
-                            });
-                            file_had_match = true;
-                        }
+            if entry.path().is_file()
+                && let Ok(content) = std::fs::read_to_string(entry.path())
+            {
+                let mut file_had_match = false;
+                for (i, line) in content.lines().enumerate() {
+                    if ac.is_match(line) {
+                        results.push(SearchResult {
+                            filepath: entry.path().to_path_buf(),
+                            line_number: i + 1,
+                            content: CompactString::from(line.trim()),
+                        });
+                        file_had_match = true;
                     }
-                    if file_had_match {
-                        files_found.insert(entry.path().to_path_buf());
-                    }
+                }
+                if file_had_match {
+                    files_found.insert(entry.path().to_path_buf());
                 }
             }
         }

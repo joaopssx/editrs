@@ -32,14 +32,13 @@ pub fn draw_tabs(f: &mut Frame, app: &App, area: Rect) {
             .any(|(j, n)| i != j && n == name);
         let mut display_name = name.clone();
 
-        if has_duplicate && name != "Untitled" {
-            if let Some(path) = &app.editors[i].filepath {
-                if let Some(parent) = path.parent() {
-                    if let Some(parent_name) = parent.file_name() {
-                        display_name = format!("{}/{}", parent_name.to_string_lossy(), name);
-                    }
-                }
-            }
+        if has_duplicate
+            && name != "Untitled"
+            && let Some(path) = &app.editors[i].filepath
+            && let Some(parent) = path.parent()
+            && let Some(parent_name) = parent.file_name()
+        {
+            display_name = format!("{}/{}", parent_name.to_string_lossy(), name);
         }
 
         if app.editors[i].dirty {

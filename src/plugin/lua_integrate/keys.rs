@@ -26,8 +26,8 @@ pub fn integrate_keys(
         }
 
         let info = lock.clone();
-        if info.is_some() {
-            lua.to_value(&info.unwrap().to_string())
+        if let Some(info) = info {
+            lua.to_value(&info.to_string())
         } else {
             lua.to_value(&mlua::Nil)
         }
