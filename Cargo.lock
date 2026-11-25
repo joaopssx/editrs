@@ -1142,6 +1142,49 @@ dependencies = [
 ]
 
 [[package]]
+name = "editrs"
+version = "0.1.0"
+dependencies = [
+ "aho-corasick",
+ "arboard",
+ "arc-swap",
+ "bumpalo",
+ "compact_str",
+ "crossbeam-channel",
+ "crossterm",
+ "evdev",
+ "git2",
+ "gix",
+ "glob",
+ "hashbrown 0.17.2",
+ "ignore",
+ "indexmap",
+ "mimalloc",
+ "mlua",
+ "modular-bitfield",
+ "online",
+ "parking_lot",
+ "pgp",
+ "portable-pty",
+ "pulldown-cmark",
+ "ratatui",
+ "rayon",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "smol_str",
+ "syntect",
+ "tar",
+ "termimad",
+ "tokio",
+ "triomphe",
+ "ureq",
+ "vt100",
+ "windows-sys 0.61.2",
+ "xz2",
+]
+
+[[package]]
 name = "either"
 version = "1.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5113,49 +5156,6 @@ checksum = "d91ed6c858b01f942cd56b37a94b3e0a1798290327d1236e4d9cf4eaca44d29d"
 dependencies = [
  "base64ct",
  "der",
-]
-
-[[package]]
-name = "sprig"
-version = "0.2.0"
-dependencies = [
- "aho-corasick",
- "arboard",
- "arc-swap",
- "bumpalo",
- "compact_str",
- "crossbeam-channel",
- "crossterm",
- "evdev",
- "git2",
- "gix",
- "glob",
- "hashbrown 0.17.2",
- "ignore",
- "indexmap",
- "mimalloc",
- "mlua",
- "modular-bitfield",
- "online",
- "parking_lot",
- "pgp",
- "portable-pty",
- "pulldown-cmark",
- "ratatui",
- "rayon",
- "reqwest",
- "serde",
- "serde_json",
- "smol_str",
- "syntect",
- "tar",
- "termimad",
- "tokio",
- "triomphe",
- "ureq",
- "vt100",
- "windows-sys 0.61.2",
- "xz2",
 ]
 
 [[package]]

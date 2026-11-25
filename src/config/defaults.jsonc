@@ -1,10 +1,10 @@
 // English
-// The above comment sets the language for Sprig to be rendered in.
+// The above comment sets the language for editrs to be rendered in.
 // It does not change the language of any of the configs.
 // The language of the configs cannot be changed due to security concerns.
 //
 // Rather than having something like...
-// [sprig]
+// [editrs]
 // language = "English"
 // We make it so that you don't need to know how to say "language" in English.
 
@@ -105,7 +105,7 @@
       },
       "search on type": true
     },
-    // Leaving it empty tells Sprig to use global for everything not chosen
+    // Leaving it empty tells editrs to use global for everything not chosen
     "local": {}
   },
   // Settings for the Git manager

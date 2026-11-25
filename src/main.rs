@@ -91,7 +91,15 @@ fn ask_continue() -> bool {
 }
 
 const OFL: &str = include_str!(concat!(env!("OUT_DIR"), "/LICENSE.0xProto"));
-const VERSION: &str = concat!("Sprig ", env!("CARGO_PKG_VERSION"));
+/// Program name, taken from Cargo.toml. Also used as the config folder name.
+pub const APP_NAME: &str = env!("CARGO_PKG_NAME");
+const VERSION: &str = concat!(
+    env!("CARGO_PKG_NAME"),
+    " ",
+    env!("CARGO_PKG_VERSION"),
+    " by ",
+    env!("CARGO_PKG_AUTHORS")
+);
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = std::env::args().collect();
@@ -186,11 +194,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     reqwest::Client::new();
 
     let path = if cfg!(windows) {
-        PathBuf::from(env::var("APPDATA")?).join("sprig")
+        PathBuf::from(env::var("APPDATA")?).join(APP_NAME)
     } else {
         // This is a standard config location, and we can store plugins here too,
         // so we can just delete our config folder and our application on uninstall
-        PathBuf::from(env::var("USERPROFILE")?).join(".config").join("sprig")
+        PathBuf::from(env::var("USERPROFILE")?).join(".config").join(APP_NAME)
     };
 
     let (plugin_tx, plugin_rx) = crossbeam_channel::unbounded();

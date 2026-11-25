@@ -91,7 +91,7 @@ pub fn map_key(key: KeyEvent, in_modal: bool, is_sidebar_focused: bool) -> Optio
                     'w' => Some(Action::CloseTab),
                     'q' => Some(Action::Quit),
                     'n' => Some(Action::OpenNewFileModal),
-                    //'N' => Some(Action::OpenNewSprig)
+                    //'N' => Some(Action::OpenNewWindow)
                     's' => Some(Action::Save),
                     't' => Some(Action::ToggleTerminal),
                     'g' => Some(Action::RefreshGit),

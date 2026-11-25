@@ -35,7 +35,7 @@ pub fn default() -> Config {
         "Next Sidebar Tab": "Ctrl+D", // Shortcut to go to the next tab
         "Refresh Git": "Ctrl+G", // Shortcut to refresh git view
         "Close Tab": "Ctrl+A", // Shortcut to close the current tab
-        "Quit": "Ctrl+W", // Shortcut to quit Sprig
+        "Quit": "Ctrl+W", // Shortcut to quit editrs
         "New File": "Ctrl+N", // Shortcut to open a new file
         "Save File": "Ctrl+S", // Shortcut to save current open file
         "Open Terminal": "Ctrl+T", // Shortcut to open the builtin terminal

@@ -312,8 +312,8 @@ pub fn draw_modal(f: &mut Frame, app: &App, area: Rect) {
             #[cfg(not(any(target_os = "redox", target_os = "espidf",)))]
             text.extend([
                 Line::from(" [ NOTE ] "),
-                Line::from(" Sprig requires a nerd font to be viewed properly. "),
-                Line::from(" They include special characters that Sprig uses. "),
+                Line::from(" editrs requires a nerd font to be viewed properly. "),
+                Line::from(" They include special characters that editrs uses. "),
             ]);
 
             text.extend([

@@ -27,6 +27,11 @@ mod ui;
 pub use crate::get_trans;
 pub mod marketplace;
 
+/// Plugin marketplace endpoint. `None` until editrs has its own marketplace
+/// server; while unset, no network request is made and the marketplace view
+/// shows an "unavailable" message.
+const MARKETPLACE_URL: Option<&str> = None;
+
 pub struct SearchResult {
     pub filepath: PathBuf,
     pub line_number: usize,
@@ -39,7 +44,7 @@ pub struct App {
     pub active_tab: usize,                   // Current active tab
     pub config: Config,                      // Configuration of editor(s) and plugin(s)
     pub modal: Option<Modal>,                // Selection windows (confirm leave, new file, etc.)
-    pub should_quit: bool,                   // Whether Sprig should quit or not
+    pub should_quit: bool,                   // Whether editrs should quit or not
     pub syntax_set: SyntaxSet,               // Syntax set for languages
     pub theme_set: ThemeSet,                 // Highlighting colors
     pub workspace: Option<tree::FileTree>,   // Sidebar things
@@ -96,7 +101,7 @@ pub enum WorldStrings {
     OpenSettingsCommand,
     GotoEditorEndCommand,
     GotoEditorStartCommand,
-    CloseSprigCommand,
+    CloseAppCommand,
     OpenHelpCommand,
 
     CorruptedPluginsError,
@@ -118,11 +123,11 @@ pub enum WorldStrings {
 impl App {
     pub fn new(plugin_rx: Receiver<PluginAction>) -> Self {
         let path = if cfg!(windows) {
-            PathBuf::from(std::env::var("APPDATA").unwrap()).join("sprig")
+            PathBuf::from(std::env::var("APPDATA").unwrap()).join(crate::APP_NAME)
         } else {
             PathBuf::from(std::env::var("USERPROFILE").unwrap())
                 .join(".config")
-                .join("sprig")
+                .join(crate::APP_NAME)
         };
 
         let user_lang = std::fs::read_to_string(path.join("config.jsonc"))
@@ -314,7 +319,7 @@ impl App {
             // } else if cfg!(target_os = "dragonfly") {
             //     "DragonFlyBSD"
             } else {
-                unreachable!("This OS is not currently supported for Sprig.")
+                unreachable!("This OS is not currently supported for editrs.")
             }),
             key_pressed: Mutex::new(None),
             focused: true,
@@ -323,10 +328,11 @@ impl App {
             marketplace_error: None,
             market_state: Arc::new(RwLock::new((
                 false,
-                Result::Err(String::from(get_trans!(
-                    strings,
-                    WorldStrings::ConnectingToInternet
-                ))),
+                Result::Err(String::from(if MARKETPLACE_URL.is_some() {
+                    get_trans!(strings, WorldStrings::ConnectingToInternet)
+                } else {
+                    get_trans!(strings, WorldStrings::WebsiteDownOrBlockedError)
+                })),
             ))),
             market_search_query: CompactString::default(),
             marketplace_listed_items: vec![],
@@ -337,7 +343,7 @@ impl App {
                 get_trans!(strings, WorldStrings::OpenSettingsCommand),
                 get_trans!(strings, WorldStrings::GotoEditorEndCommand),
                 get_trans!(strings, WorldStrings::GotoEditorStartCommand),
-                get_trans!(strings, WorldStrings::CloseSprigCommand),
+                get_trans!(strings, WorldStrings::CloseAppCommand),
                 get_trans!(strings, WorldStrings::OpenTerminalCommand),
                 get_trans!(strings, WorldStrings::OpenHelpCommand),
             ],
@@ -437,11 +443,12 @@ impl App {
     pub fn run(&mut self, term: &mut ratatui::DefaultTerminal) -> std::io::Result<()> {
         //let cell = Arc::clone(&self.market_state);
         while !self.should_quit {
+            if let Some(url) = MARKETPLACE_URL {
             let cell = Arc::clone(&self.market_state);
             let lang = self.translations.clone();
             rayon::spawn(move || {
                 if online::check(None).is_ok() {
-                    let result = match reqwest::blocking::get("https://sprig.swimming.cat/search/") {
+                    let result = match reqwest::blocking::get(url) {
                         Ok(resp) => match resp.json::<Vec<MarketplacePlugin>>() {
                             Ok(plugins) => Ok(plugins),
                             Err(_) => Err(String::from(get_trans!(
@@ -473,6 +480,7 @@ impl App {
                     );
                 }
             });
+            }
 
             let state = self.market_state.read();
             let (online, result) = &*state;
@@ -523,7 +531,7 @@ impl App {
                         self.config.insert(name, json!(value));
                     }
                     PluginAction::GetKeyPress { responder } => {
-                        // Since this is something dependent on the user, if they don't have Sprig focused,
+                        // Since this is something dependent on the user, if they don't have editrs focused,
                         // they can't type, so it's faster to give a value instead of get a value then
                         // give the value back to the plugin
                         let mut lock = responder.string.lock();
