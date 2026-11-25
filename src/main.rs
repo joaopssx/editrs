@@ -3,17 +3,20 @@ pub mod components;
 pub mod config;
 pub mod core;
 pub mod input;
-pub mod windows;
 pub mod plugin;
+pub mod windows;
 
 use app::App;
+use crossterm::{
+    event::{DisableFocusChange, EnableFocusChange},
+    execute,
+};
 use std::error::Error;
 use std::io::stdin;
 use std::path::PathBuf;
+use std::process::Command;
 use std::process::exit;
 use std::{env, fs};
-use crossterm::{execute, event::{EnableFocusChange, DisableFocusChange}};
-use std::process::Command;
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
@@ -27,10 +30,7 @@ fn escalate_privileges() -> bool {
 
     // Filter out the '--admin' flag so the new instance doesn't loop infinitely,
     // but pass all other original user arguments forward!
-    let forward_args: Vec<String> = env::args()
-        .skip(1)
-        .filter(|arg| arg != "--admin")
-        .collect();
+    let forward_args: Vec<String> = env::args().skip(1).filter(|arg| arg != "--admin").collect();
 
     #[cfg(windows)]
     {
@@ -106,15 +106,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut target = PathBuf::from(".").canonicalize().unwrap();
 
     // TODO: Make it so that it checks for doubles before running
-    let mut seen: std::collections::HashSet<&str> =
-        std::collections::HashSet::new();
+    let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
 
     for arg in args.iter().skip(1) {
         if let Some(arg) = arg.strip_prefix("--license=") {
             match arg.trim_matches('"').to_ascii_lowercase().as_str() {
                 "ofl" => {
                     println!("\n{}", OFL);
-
                 }
                 "all" => {
                     println!("\n{}", OFL);
@@ -148,7 +146,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 stdin().read_line(&mut String::new()).ok();
             }
             "--question" => {
-                if !ask_continue() { exit(0); }
+                if !ask_continue() {
+                    exit(0);
+                }
             }
             s if s.starts_with('-') => {
                 for chr in s[1..].chars() {
@@ -171,7 +171,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                             stdin().read_line(&mut String::new()).ok();
                         }
                         'q' => {
-                            if !ask_continue() { exit(0); }
+                            if !ask_continue() {
+                                exit(0);
+                            }
                         }
                         _ => {
                             eprintln!("Error: Unknown flag '{}'", chr);
@@ -198,7 +200,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     } else {
         // This is a standard config location, and we can store plugins here too,
         // so we can just delete our config folder and our application on uninstall
-        PathBuf::from(env::var("USERPROFILE")?).join(".config").join(APP_NAME)
+        PathBuf::from(env::var("USERPROFILE")?)
+            .join(".config")
+            .join(APP_NAME)
     };
 
     let (plugin_tx, plugin_rx) = crossbeam_channel::unbounded();
@@ -206,10 +210,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     if path.exists() {
         if path.join("config").exists() {
             if fs::read_dir(&path.join("plugins"))
-                  .map(|mut entries| entries.next().is_some()) // Check if at least one file exists
-                  .unwrap_or(false) {
-
-
+                .map(|mut entries| entries.next().is_some()) // Check if at least one file exists
+                .unwrap_or(false)
+            {
                 rayon::ThreadPoolBuilder::new()
                     .num_threads(3)
                     .build_global()

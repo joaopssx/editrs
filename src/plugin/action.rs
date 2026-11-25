@@ -1,4 +1,4 @@
-use parking_lot::{Mutex, Condvar};
+use parking_lot::{Condvar, Mutex};
 use triomphe::Arc;
 
 #[derive(Debug)]
@@ -32,29 +32,93 @@ pub struct CharResponder {
 
 #[derive(Debug, Clone)]
 pub enum PluginAction {
-    MakeSetting { name: String, value: serde_json::Value },
-    GetSettingValue { name: String, responder: Arc<SerdeResponder> },
-    DebugLog { message: String },
-    SetSetting { name: String, value: serde_json::Value },
-    InsertStrAtCursor { txt: String },
-    GetKeyPress { responder: Arc<StrResponder> },
-    GetCursorPos { responder: Arc<UsizeVecResponder> },
-    GetCursorX { responder: Arc<UsizeResponder> },
-    GetCursorY { responder: Arc<UsizeResponder> },
-    SetCursorX { x: usize },
-    SetCursorY { y: usize },
-    SetCursorPos { pos: Vec<usize> },
-    GetLine { line: usize, responder: Arc<StrResponder> },
-    SetLine { line: usize, contents: String },
-    SetStrAt { from: Vec<usize>, to: Vec<usize>, txt: String },
-    GetStrAt { from: Vec<usize>, to: Vec<usize>, responder: Arc<StrResponder> },
-    InsertStrAt { pos: Vec<usize>,txt: String },
-    SetCharAt { pos: Vec<usize>, c: char },
-    SetCharAtCursor { c: char },
-    GetCharAt { pos: Vec<usize>, responder: Arc<CharResponder> },
-    GetCharAtCursor { responder: Arc<CharResponder> },
-    InsertCharAt { pos: Vec<usize>, c: char },
-    InsertCharAtCursor { c: char },
-    MakeCommand { name: String, func: mlua::Function },
-    RemoveCommand { name: String },
+    MakeSetting {
+        name: String,
+        value: serde_json::Value,
+    },
+    GetSettingValue {
+        name: String,
+        responder: Arc<SerdeResponder>,
+    },
+    DebugLog {
+        message: String,
+    },
+    SetSetting {
+        name: String,
+        value: serde_json::Value,
+    },
+    InsertStrAtCursor {
+        txt: String,
+    },
+    GetKeyPress {
+        responder: Arc<StrResponder>,
+    },
+    GetCursorPos {
+        responder: Arc<UsizeVecResponder>,
+    },
+    GetCursorX {
+        responder: Arc<UsizeResponder>,
+    },
+    GetCursorY {
+        responder: Arc<UsizeResponder>,
+    },
+    SetCursorX {
+        x: usize,
+    },
+    SetCursorY {
+        y: usize,
+    },
+    SetCursorPos {
+        pos: Vec<usize>,
+    },
+    GetLine {
+        line: usize,
+        responder: Arc<StrResponder>,
+    },
+    SetLine {
+        line: usize,
+        contents: String,
+    },
+    SetStrAt {
+        from: Vec<usize>,
+        to: Vec<usize>,
+        txt: String,
+    },
+    GetStrAt {
+        from: Vec<usize>,
+        to: Vec<usize>,
+        responder: Arc<StrResponder>,
+    },
+    InsertStrAt {
+        pos: Vec<usize>,
+        txt: String,
+    },
+    SetCharAt {
+        pos: Vec<usize>,
+        c: char,
+    },
+    SetCharAtCursor {
+        c: char,
+    },
+    GetCharAt {
+        pos: Vec<usize>,
+        responder: Arc<CharResponder>,
+    },
+    GetCharAtCursor {
+        responder: Arc<CharResponder>,
+    },
+    InsertCharAt {
+        pos: Vec<usize>,
+        c: char,
+    },
+    InsertCharAtCursor {
+        c: char,
+    },
+    MakeCommand {
+        name: String,
+        func: mlua::Function,
+    },
+    RemoveCommand {
+        name: String,
+    },
 }

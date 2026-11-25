@@ -11,8 +11,7 @@ fn main() {
         let out_dir = std::env::var("OUT_DIR").unwrap();
         let dest_usage_path = Path::new(&out_dir).join("usage.rs");
 
-        let mut usage_raw = fs::read_to_string("README.md")
-            .expect("Failed to read README");
+        let mut usage_raw = fs::read_to_string("README.md").expect("Failed to read README");
 
         let usage_index = usage_raw
             .find("## Usage")
@@ -50,7 +49,8 @@ fn main() {
         if !font_ttf.exists() || !font_license.exists() {
             println!("cargo:warning=Downloading 0xProto Nerd Font...");
 
-            let url = "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.3.0/0xProto.tar.xz";
+            let url =
+                "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.3.0/0xProto.tar.xz";
 
             let response = ureq::get(url)
                 .call()
@@ -61,7 +61,7 @@ fn main() {
             let xz_reader = xz2::read::XzDecoder::new(body.as_reader());
             let mut archive = tar::Archive::new(xz_reader);
 
-            let mut got_font    = false;
+            let mut got_font = false;
             let mut got_license = false;
 
             for entry in archive.entries().expect("Failed to read tar entries") {
@@ -73,7 +73,9 @@ fn main() {
                     entry.unpack(&font_ttf).expect("Failed to extract font");
                     got_font = true;
                 } else if name == "LICENSE" {
-                    entry.unpack(&font_license).expect("Failed to extract LICENSE");
+                    entry
+                        .unpack(&font_license)
+                        .expect("Failed to extract LICENSE");
                     got_license = true;
                 }
 
@@ -82,7 +84,10 @@ fn main() {
                 }
             }
 
-            assert!(got_font,    "0xProtoNerdFontMono-Regular.ttf not found in archive");
+            assert!(
+                got_font,
+                "0xProtoNerdFontMono-Regular.ttf not found in archive"
+            );
             assert!(got_license, "LICENSE not found in archive");
 
             println!("cargo:warning=Font ready.");

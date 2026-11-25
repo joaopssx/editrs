@@ -444,42 +444,42 @@ impl App {
         //let cell = Arc::clone(&self.market_state);
         while !self.should_quit {
             if let Some(url) = MARKETPLACE_URL {
-            let cell = Arc::clone(&self.market_state);
-            let lang = self.translations.clone();
-            rayon::spawn(move || {
-                if online::check(None).is_ok() {
-                    let result = match reqwest::blocking::get(url) {
-                        Ok(resp) => match resp.json::<Vec<MarketplacePlugin>>() {
-                            Ok(plugins) => Ok(plugins),
+                let cell = Arc::clone(&self.market_state);
+                let lang = self.translations.clone();
+                rayon::spawn(move || {
+                    if online::check(None).is_ok() {
+                        let result = match reqwest::blocking::get(url) {
+                            Ok(resp) => match resp.json::<Vec<MarketplacePlugin>>() {
+                                Ok(plugins) => Ok(plugins),
+                                Err(_) => Err(String::from(get_trans!(
+                                    lang,
+                                    WorldStrings::CorruptedPluginsError
+                                ))),
+                            },
+                            Err(e) if e.is_connect() => Err(String::from(get_trans!(
+                                lang,
+                                WorldStrings::WebsiteDownOrBlockedError
+                            ))),
+                            Err(e) if e.is_timeout() => Err(String::from(get_trans!(
+                                lang,
+                                WorldStrings::ConnectionTimeOutError
+                            ))),
                             Err(_) => Err(String::from(get_trans!(
                                 lang,
-                                WorldStrings::CorruptedPluginsError
+                                WorldStrings::InternetUnknownError
                             ))),
-                        },
-                        Err(e) if e.is_connect() => Err(String::from(get_trans!(
-                            lang,
-                            WorldStrings::WebsiteDownOrBlockedError
-                        ))),
-                        Err(e) if e.is_timeout() => Err(String::from(get_trans!(
-                            lang,
-                            WorldStrings::ConnectionTimeOutError
-                        ))),
-                        Err(_) => Err(String::from(get_trans!(
-                            lang,
-                            WorldStrings::InternetUnknownError
-                        ))),
-                    };
-                    *cell.write() = (true, result);
-                } else {
-                    *cell.write() = (
-                        false,
-                        Err(String::from(get_trans!(
-                            lang,
-                            WorldStrings::NoInternetError
-                        ))),
-                    );
-                }
-            });
+                        };
+                        *cell.write() = (true, result);
+                    } else {
+                        *cell.write() = (
+                            false,
+                            Err(String::from(get_trans!(
+                                lang,
+                                WorldStrings::NoInternetError
+                            ))),
+                        );
+                    }
+                });
             }
 
             let state = self.market_state.read();
@@ -771,7 +771,7 @@ impl App {
 
     fn handle_key(&mut self, key: event::KeyEvent) {
         use crate::input::{action::Action, keymap};
-        use crossterm::event::{KeyCode, KeyModifiers, KeyEventKind};
+        use crossterm::event::{KeyCode, KeyEventKind, KeyModifiers};
         if key.kind != KeyEventKind::Press {
             return;
         }

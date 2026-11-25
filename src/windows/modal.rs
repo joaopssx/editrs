@@ -27,8 +27,7 @@ impl ModalType {
             ModalType::Search
             | ModalType::Replace
             | ModalType::ReplaceAll
-            | ModalType::CommandPallete
-            => ModalLayout::Island,
+            | ModalType::CommandPallete => ModalLayout::Island,
 
             ModalType::QuitPrompt
             | ModalType::ConfirmExit
@@ -36,14 +35,17 @@ impl ModalType {
             | ModalType::NewFile
             | ModalType::CloseTabPrompt
             | ModalType::DeleteFile
-            | ModalType::Settings
-            => ModalLayout::Popup,
+            | ModalType::Settings => ModalLayout::Popup,
         }
     }
 
     pub fn alignment(&self) -> Alignment {
         match self {
-            ModalType::QuitPrompt | ModalType::ConfirmExit | ModalType::NewFile | ModalType::CloseTabPrompt | ModalType::DeleteFile => Alignment::Center,
+            ModalType::QuitPrompt
+            | ModalType::ConfirmExit
+            | ModalType::NewFile
+            | ModalType::CloseTabPrompt
+            | ModalType::DeleteFile => Alignment::Center,
             _ => Alignment::Left,
         }
     }
@@ -60,18 +62,17 @@ pub struct Modal {
 
 impl Modal {
     pub fn new(modal_type: ModalType) -> Self {
-        let active_button =
-            match modal_type {
-                // "No" by default on all
-                ModalType::QuitPrompt => 1,
-                ModalType::ConfirmExit => 0,
-                ModalType::Replace => 0,
-                ModalType::ReplaceAll => 0,
-                ModalType::Search => 0,
-                ModalType::NewFile => 0,
-                ModalType::DeleteFile => 0,
-                _ => 0
-            };
+        let active_button = match modal_type {
+            // "No" by default on all
+            ModalType::QuitPrompt => 1,
+            ModalType::ConfirmExit => 0,
+            ModalType::Replace => 0,
+            ModalType::ReplaceAll => 0,
+            ModalType::Search => 0,
+            ModalType::NewFile => 0,
+            ModalType::DeleteFile => 0,
+            _ => 0,
+        };
 
         Self {
             modal_type,

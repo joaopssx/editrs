@@ -1,10 +1,14 @@
 use crate::plugin::action::{PluginAction, UsizeResponder, UsizeVecResponder};
-use parking_lot::{Mutex, Condvar};
-use triomphe::Arc;
 use mlua::{self, LuaSerdeExt};
+use parking_lot::{Condvar, Mutex};
+use triomphe::Arc;
 
 // cursor.pos.get()
-fn get_cursor_pos(lua: &mlua::Lua, tx: &crossbeam_channel::Sender<PluginAction>, cursor_table_get: &mlua::Table)  -> Result<(), mlua::Error> {
+fn get_cursor_pos(
+    lua: &mlua::Lua,
+    tx: &crossbeam_channel::Sender<PluginAction>,
+    cursor_table_get: &mlua::Table,
+) -> Result<(), mlua::Error> {
     let vec_responder = Arc::new(UsizeVecResponder {
         numbers: Mutex::new(None),
         signal: Condvar::new(),
@@ -12,9 +16,12 @@ fn get_cursor_pos(lua: &mlua::Lua, tx: &crossbeam_channel::Sender<PluginAction>,
 
     let tx = tx.clone();
     let responder_clone = vec_responder.clone();
-    cursor_table_get.set("get",
-        lua.create_function(move |lua, ()|{
-            let _ = tx.send(PluginAction::GetCursorPos { responder: responder_clone.clone() });
+    cursor_table_get.set(
+        "get",
+        lua.create_function(move |lua, ()| {
+            let _ = tx.send(PluginAction::GetCursorPos {
+                responder: responder_clone.clone(),
+            });
             let mut lock = responder_clone.numbers.lock();
             if lock.is_none() {
                 responder_clone.signal.wait(&mut lock);
@@ -27,12 +34,20 @@ fn get_cursor_pos(lua: &mlua::Lua, tx: &crossbeam_channel::Sender<PluginAction>,
 }
 
 // cursor.x.get()
-fn get_cursor_x(lua: &mlua::Lua, tx: &crossbeam_channel::Sender<PluginAction>, cursor_table_get: &mlua::Table, responder: &Arc<UsizeResponder>)  -> Result<(), mlua::Error> {
+fn get_cursor_x(
+    lua: &mlua::Lua,
+    tx: &crossbeam_channel::Sender<PluginAction>,
+    cursor_table_get: &mlua::Table,
+    responder: &Arc<UsizeResponder>,
+) -> Result<(), mlua::Error> {
     let tx = tx.clone();
     let responder_clone = responder.clone();
-    cursor_table_get.set("get",
+    cursor_table_get.set(
+        "get",
         lua.create_function(move |lua, ()| {
-            let _ = tx.send(PluginAction::GetCursorX { responder: responder_clone.clone() });
+            let _ = tx.send(PluginAction::GetCursorX {
+                responder: responder_clone.clone(),
+            });
             let mut lock = responder_clone.number.lock();
             if lock.is_none() {
                 responder_clone.signal.wait(&mut lock);

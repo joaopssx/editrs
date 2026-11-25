@@ -1,5 +1,5 @@
-use hashbrown::HashMap;
 use crate::app::WorldStrings;
+use hashbrown::HashMap;
 
 #[macro_export]
 macro_rules! get_trans {
@@ -30,25 +30,25 @@ pub enum Languages {
 }
 
 pub fn get_pretty_name(lang: Languages) -> &'static str {
-  match lang {
-      Languages::Korean => "한국어",
-      Languages::UKEnglish => "British English",
-      Languages::English => "English",
-      Languages::CAFrench => "Français canadien",
-      Languages::FRFrench => "France française",
-      Languages::Japanese => "日本語",
-      Languages::SimplifiedChinese => "简体中文",
-      Languages::TraditionalChinese => "繁體中文",
-      Languages::Polish => "Polska",
-      Languages::German => "Deutsch",
-      Languages::Dutch => "Nederlands",
-      Languages::LolCat => "LOL cat",
-      Languages::Spanish => "Español",
-      Languages::Russian => "Русский",
-      Languages::Ukrainian => "Украинский",
-      // Languages::Arabic => "",
-      // Languages::Greek => "",
-  }
+    match lang {
+        Languages::Korean => "한국어",
+        Languages::UKEnglish => "British English",
+        Languages::English => "English",
+        Languages::CAFrench => "Français canadien",
+        Languages::FRFrench => "France française",
+        Languages::Japanese => "日本語",
+        Languages::SimplifiedChinese => "简体中文",
+        Languages::TraditionalChinese => "繁體中文",
+        Languages::Polish => "Polska",
+        Languages::German => "Deutsch",
+        Languages::Dutch => "Nederlands",
+        Languages::LolCat => "LOL cat",
+        Languages::Spanish => "Español",
+        Languages::Russian => "Русский",
+        Languages::Ukrainian => "Украинский",
+        // Languages::Arabic => "",
+        // Languages::Greek => "",
+    }
 }
 
 pub fn undo_pretty_name(lang: &str) -> Languages {
@@ -72,7 +72,6 @@ pub fn undo_pretty_name(lang: &str) -> Languages {
     }
 }
 
-
 pub fn build_lang_map(lang_setting: Languages) -> HashMap<WorldStrings, &'static str> {
     match lang_setting {
         Languages::Korean => HashMap::from([
@@ -82,10 +81,22 @@ pub fn build_lang_map(lang_setting: Languages) -> HashMap<WorldStrings, &'static
             (WorldStrings::GotoEditorStartCommand, "편집기 시작으로 이동"),
             (WorldStrings::CloseAppCommand, "editrs 닫기"),
             (WorldStrings::OpenHelpCommand, "도움말 열기"),
-            (WorldStrings::CorruptedPluginsError, "플러그인 목록이 손상되었을 수 있습니다"),
-            (WorldStrings::WebsiteDownOrBlockedError, "웹사이트가 다운되었거나 차단되었을 수 있습니다"),
-            (WorldStrings::ConnectionTimeOutError, "연결 시간이 초과되었습니다"),
-            (WorldStrings::InternetUnknownError, "알 수 없는 오류가 발생했습니다"),
+            (
+                WorldStrings::CorruptedPluginsError,
+                "플러그인 목록이 손상되었을 수 있습니다",
+            ),
+            (
+                WorldStrings::WebsiteDownOrBlockedError,
+                "웹사이트가 다운되었거나 차단되었을 수 있습니다",
+            ),
+            (
+                WorldStrings::ConnectionTimeOutError,
+                "연결 시간이 초과되었습니다",
+            ),
+            (
+                WorldStrings::InternetUnknownError,
+                "알 수 없는 오류가 발생했습니다",
+            ),
             (WorldStrings::NoInternetError, "인터넷 연결 없음"),
             (WorldStrings::ConnectingToInternet, "연결을 시도하는 중..."),
             (WorldStrings::WordSetting, "설정"),
@@ -98,16 +109,37 @@ pub fn build_lang_map(lang_setting: Languages) -> HashMap<WorldStrings, &'static
         Languages::CAFrench => HashMap::from([
             (WorldStrings::OpenTerminalCommand, "Ouvrir le terminal"),
             (WorldStrings::OpenSettingsCommand, "Ouvrir les paramètres"),
-            (WorldStrings::GotoEditorEndCommand, "Aller à la fin de l'éditeur"),
-            (WorldStrings::GotoEditorStartCommand, "Aller au début de l'éditeur"),
+            (
+                WorldStrings::GotoEditorEndCommand,
+                "Aller à la fin de l'éditeur",
+            ),
+            (
+                WorldStrings::GotoEditorStartCommand,
+                "Aller au début de l'éditeur",
+            ),
             (WorldStrings::CloseAppCommand, "Fermer editrs"),
             (WorldStrings::OpenHelpCommand, "Ouvrir l'aide"),
-            (WorldStrings::CorruptedPluginsError, "La liste des modules d'extension est peut-être corrompue"),
-            (WorldStrings::WebsiteDownOrBlockedError, "Le site Web est peut-être inaccessible ou bloqué pour le moment"),
-            (WorldStrings::ConnectionTimeOutError, "La connexion a expiré"),
-            (WorldStrings::InternetUnknownError, "Une erreur inconnue est survenue"),
+            (
+                WorldStrings::CorruptedPluginsError,
+                "La liste des modules d'extension est peut-être corrompue",
+            ),
+            (
+                WorldStrings::WebsiteDownOrBlockedError,
+                "Le site Web est peut-être inaccessible ou bloqué pour le moment",
+            ),
+            (
+                WorldStrings::ConnectionTimeOutError,
+                "La connexion a expiré",
+            ),
+            (
+                WorldStrings::InternetUnknownError,
+                "Une erreur inconnue est survenue",
+            ),
             (WorldStrings::NoInternetError, "Pas de connexion Internet"),
-            (WorldStrings::ConnectingToInternet, "Tentative de connexion..."),
+            (
+                WorldStrings::ConnectingToInternet,
+                "Tentative de connexion...",
+            ),
             (WorldStrings::WordSetting, "Paramètres"),
             (WorldStrings::WordMarketplace, "Marché en ligne"),
             (WorldStrings::WordSearch, "Recherche"),
@@ -118,16 +150,37 @@ pub fn build_lang_map(lang_setting: Languages) -> HashMap<WorldStrings, &'static
         Languages::FRFrench => HashMap::from([
             (WorldStrings::OpenTerminalCommand, "Ouvrir le terminal"),
             (WorldStrings::OpenSettingsCommand, "Ouvrir les paramètres"),
-            (WorldStrings::GotoEditorEndCommand, "Aller à la fin de l'éditeur"),
-            (WorldStrings::GotoEditorStartCommand, "Aller au début de l'éditeur"),
+            (
+                WorldStrings::GotoEditorEndCommand,
+                "Aller à la fin de l'éditeur",
+            ),
+            (
+                WorldStrings::GotoEditorStartCommand,
+                "Aller au début de l'éditeur",
+            ),
             (WorldStrings::CloseAppCommand, "Fermer editrs"),
             (WorldStrings::OpenHelpCommand, "Ouvrir l'aide"),
-            (WorldStrings::CorruptedPluginsError, "La liste des plugins est peut-être corrompue"),
-            (WorldStrings::WebsiteDownOrBlockedError, "Le site web peut être hors service ou bloqué en ce moment"),
-            (WorldStrings::ConnectionTimeOutError, "La connexion a expiré"),
-            (WorldStrings::InternetUnknownError, "Une erreur inconnue s'est produite"),
+            (
+                WorldStrings::CorruptedPluginsError,
+                "La liste des plugins est peut-être corrompue",
+            ),
+            (
+                WorldStrings::WebsiteDownOrBlockedError,
+                "Le site web peut être hors service ou bloqué en ce moment",
+            ),
+            (
+                WorldStrings::ConnectionTimeOutError,
+                "La connexion a expiré",
+            ),
+            (
+                WorldStrings::InternetUnknownError,
+                "Une erreur inconnue s'est produite",
+            ),
             (WorldStrings::NoInternetError, "Pas de connexion internet"),
-            (WorldStrings::ConnectingToInternet, "Tentative de connexion..."),
+            (
+                WorldStrings::ConnectingToInternet,
+                "Tentative de connexion...",
+            ),
             (WorldStrings::WordSetting, "Paramètres"),
             (WorldStrings::WordMarketplace, "Place de marché"),
             (WorldStrings::WordSearch, "Rechercher"),
@@ -139,15 +192,33 @@ pub fn build_lang_map(lang_setting: Languages) -> HashMap<WorldStrings, &'static
             (WorldStrings::OpenTerminalCommand, "Open Terminal"),
             (WorldStrings::OpenSettingsCommand, "Open Settings"),
             (WorldStrings::GotoEditorEndCommand, "Go to end of editor"),
-            (WorldStrings::GotoEditorStartCommand, "Go to start of editor"),
+            (
+                WorldStrings::GotoEditorStartCommand,
+                "Go to start of editor",
+            ),
             (WorldStrings::CloseAppCommand, "Close editrs"),
             (WorldStrings::OpenHelpCommand, "Open Help"),
-            (WorldStrings::CorruptedPluginsError, "The list of plugins might be corrupted"),
-            (WorldStrings::WebsiteDownOrBlockedError, "The website may be down or blocked right now"),
-            (WorldStrings::ConnectionTimeOutError, "The connection timed out"),
-            (WorldStrings::InternetUnknownError, "An unknown error occured"),
+            (
+                WorldStrings::CorruptedPluginsError,
+                "The list of plugins might be corrupted",
+            ),
+            (
+                WorldStrings::WebsiteDownOrBlockedError,
+                "The website may be down or blocked right now",
+            ),
+            (
+                WorldStrings::ConnectionTimeOutError,
+                "The connection timed out",
+            ),
+            (
+                WorldStrings::InternetUnknownError,
+                "An unknown error occured",
+            ),
             (WorldStrings::NoInternetError, "No internet connection"),
-            (WorldStrings::ConnectingToInternet, "Attempting to connect..."),
+            (
+                WorldStrings::ConnectingToInternet,
+                "Attempting to connect...",
+            ),
             (WorldStrings::WordSetting, "Settings"),
             (WorldStrings::WordMarketplace, "Marketplace"),
             (WorldStrings::WordSearch, "Search"),
@@ -159,15 +230,33 @@ pub fn build_lang_map(lang_setting: Languages) -> HashMap<WorldStrings, &'static
             (WorldStrings::OpenTerminalCommand, "Open Terminal"),
             (WorldStrings::OpenSettingsCommand, "Open Settings"),
             (WorldStrings::GotoEditorEndCommand, "Go to end of editor"),
-            (WorldStrings::GotoEditorStartCommand, "Go to start of editor"),
+            (
+                WorldStrings::GotoEditorStartCommand,
+                "Go to start of editor",
+            ),
             (WorldStrings::CloseAppCommand, "Close editrs"),
             (WorldStrings::OpenHelpCommand, "Open Help"),
-            (WorldStrings::CorruptedPluginsError, "The list of plugins might be corrupted"),
-            (WorldStrings::WebsiteDownOrBlockedError, "The website may be down or blocked right now"),
-            (WorldStrings::ConnectionTimeOutError, "The connection timed out"),
-            (WorldStrings::InternetUnknownError, "An unknown error occured"),
+            (
+                WorldStrings::CorruptedPluginsError,
+                "The list of plugins might be corrupted",
+            ),
+            (
+                WorldStrings::WebsiteDownOrBlockedError,
+                "The website may be down or blocked right now",
+            ),
+            (
+                WorldStrings::ConnectionTimeOutError,
+                "The connection timed out",
+            ),
+            (
+                WorldStrings::InternetUnknownError,
+                "An unknown error occured",
+            ),
             (WorldStrings::NoInternetError, "No internet connection"),
-            (WorldStrings::ConnectingToInternet, "Attempting to connect..."),
+            (
+                WorldStrings::ConnectingToInternet,
+                "Attempting to connect...",
+            ),
             (WorldStrings::WordSetting, "Settings"),
             (WorldStrings::WordMarketplace, "Marketplace"),
             (WorldStrings::WordSearch, "Search"),
@@ -182,11 +271,26 @@ pub fn build_lang_map(lang_setting: Languages) -> HashMap<WorldStrings, &'static
             (WorldStrings::GotoEditorStartCommand, "エディタの先頭に移動"),
             (WorldStrings::CloseAppCommand, "editrsを閉じる"),
             (WorldStrings::OpenHelpCommand, "ヘルプを開く"),
-            (WorldStrings::CorruptedPluginsError, "プラグインの一覧が破損している可能性があります"),
-            (WorldStrings::WebsiteDownOrBlockedError, "ウェブサイトがダウンしているか、ブロックされている可能性があります"),
-            (WorldStrings::ConnectionTimeOutError, "接続がタイムアウトしました"),
-            (WorldStrings::InternetUnknownError, "不明なエラーが発生しました"),
-            (WorldStrings::NoInternetError, "インターネットに接続されていません"),
+            (
+                WorldStrings::CorruptedPluginsError,
+                "プラグインの一覧が破損している可能性があります",
+            ),
+            (
+                WorldStrings::WebsiteDownOrBlockedError,
+                "ウェブサイトがダウンしているか、ブロックされている可能性があります",
+            ),
+            (
+                WorldStrings::ConnectionTimeOutError,
+                "接続がタイムアウトしました",
+            ),
+            (
+                WorldStrings::InternetUnknownError,
+                "不明なエラーが発生しました",
+            ),
+            (
+                WorldStrings::NoInternetError,
+                "インターネットに接続されていません",
+            ),
             (WorldStrings::ConnectingToInternet, "接続を試みています..."),
             (WorldStrings::WordSetting, "設定"),
             (WorldStrings::WordMarketplace, "マーケットプレイス"),
@@ -198,14 +302,32 @@ pub fn build_lang_map(lang_setting: Languages) -> HashMap<WorldStrings, &'static
         Languages::Dutch => HashMap::from([
             (WorldStrings::OpenTerminalCommand, "Terminal openen"),
             (WorldStrings::OpenSettingsCommand, "Instellingen openen"),
-            (WorldStrings::GotoEditorEndCommand, "Ga naar einde van editor"),
-            (WorldStrings::GotoEditorStartCommand, "Ga naar begin van editor"),
+            (
+                WorldStrings::GotoEditorEndCommand,
+                "Ga naar einde van editor",
+            ),
+            (
+                WorldStrings::GotoEditorStartCommand,
+                "Ga naar begin van editor",
+            ),
             (WorldStrings::CloseAppCommand, "editrs sluiten"),
             (WorldStrings::OpenHelpCommand, "Help openen"),
-            (WorldStrings::CorruptedPluginsError, "De lijst met plug-ins is mogelijk beschadigd"),
-            (WorldStrings::WebsiteDownOrBlockedError, "De website is momenteall mogelijk offline of geblokkeerd"),
-            (WorldStrings::ConnectionTimeOutError, "Verbindungstime-out verstreken"),
-            (WorldStrings::InternetUnknownError, "Er is een onbekende fout opgetreden"),
+            (
+                WorldStrings::CorruptedPluginsError,
+                "De lijst met plug-ins is mogelijk beschadigd",
+            ),
+            (
+                WorldStrings::WebsiteDownOrBlockedError,
+                "De website is momenteall mogelijk offline of geblokkeerd",
+            ),
+            (
+                WorldStrings::ConnectionTimeOutError,
+                "Verbindungstime-out verstreken",
+            ),
+            (
+                WorldStrings::InternetUnknownError,
+                "Er is een onbekende fout opgetreden",
+            ),
             (WorldStrings::NoInternetError, "Geen internetverbinding"),
             (WorldStrings::ConnectingToInternet, "Verbinden proberen..."),
             (WorldStrings::WordSetting, "Instellingen"),
@@ -218,16 +340,37 @@ pub fn build_lang_map(lang_setting: Languages) -> HashMap<WorldStrings, &'static
         Languages::German => HashMap::from([
             (WorldStrings::OpenTerminalCommand, "Terminal öffnen"),
             (WorldStrings::OpenSettingsCommand, "Einstellungen öffnen"),
-            (WorldStrings::GotoEditorEndCommand, "Zum Ende des Editors springen"),
-            (WorldStrings::GotoEditorStartCommand, "Zum Anfang des Editors springen"),
+            (
+                WorldStrings::GotoEditorEndCommand,
+                "Zum Ende des Editors springen",
+            ),
+            (
+                WorldStrings::GotoEditorStartCommand,
+                "Zum Anfang des Editors springen",
+            ),
             (WorldStrings::CloseAppCommand, "editrs schließen"),
             (WorldStrings::OpenHelpCommand, "Hilfe öffnen"),
-            (WorldStrings::CorruptedPluginsError, "Die Plugin-Liste könnte beschädigt sein"),
-            (WorldStrings::WebsiteDownOrBlockedError, "Die Website könnte gerade offline oder gesperrt sein"),
-            (WorldStrings::ConnectionTimeOutError, "Zeitüberschreitung der Verbindung"),
-            (WorldStrings::ConnectingToInternet, "Verbindung wird hergestellt..."),
+            (
+                WorldStrings::CorruptedPluginsError,
+                "Die Plugin-Liste könnte beschädigt sein",
+            ),
+            (
+                WorldStrings::WebsiteDownOrBlockedError,
+                "Die Website könnte gerade offline oder gesperrt sein",
+            ),
+            (
+                WorldStrings::ConnectionTimeOutError,
+                "Zeitüberschreitung der Verbindung",
+            ),
+            (
+                WorldStrings::ConnectingToInternet,
+                "Verbindung wird hergestellt...",
+            ),
             (WorldStrings::NoInternetError, "Keine Internetverbindung"),
-            (WorldStrings::InternetUnknownError, "Ein unbekannter Fehler ist aufgetreten"),
+            (
+                WorldStrings::InternetUnknownError,
+                "Ein unbekannter Fehler ist aufgetreten",
+            ),
             (WorldStrings::WordSetting, "Einstellungen"),
             (WorldStrings::WordMarketplace, "Marktplatz"),
             (WorldStrings::WordSearch, "Suchen"),
@@ -238,16 +381,37 @@ pub fn build_lang_map(lang_setting: Languages) -> HashMap<WorldStrings, &'static
         Languages::LolCat => HashMap::from([
             (WorldStrings::OpenTerminalCommand, "pLz open teH tirmenal"),
             (WorldStrings::OpenSettingsCommand, "hi, opin setingz, k?"),
-            (WorldStrings::GotoEditorEndCommand, "go TO IND of tha EDitr Plez"),
-            (WorldStrings::GotoEditorStartCommand, "gO stArt Of dis ediTR plZ"),
+            (
+                WorldStrings::GotoEditorEndCommand,
+                "go TO IND of tha EDitr Plez",
+            ),
+            (
+                WorldStrings::GotoEditorStartCommand,
+                "gO stArt Of dis ediTR plZ",
+            ),
             (WorldStrings::CloseAppCommand, "Cloze editrs"),
             (WorldStrings::OpenHelpCommand, "plZ help mI"),
-            (WorldStrings::CorruptedPluginsError, "pluginz MIt be coruptz"),
-            (WorldStrings::WebsiteDownOrBlockedError, "ThE Websait iz down or itZ blokd"),
-            (WorldStrings::ConnectionTimeOutError, "I thenk thi coNekshun in TimE outs"),
-            (WorldStrings::InternetUnknownError, "oh.. not nown eruR okkured"),
+            (
+                WorldStrings::CorruptedPluginsError,
+                "pluginz MIt be coruptz",
+            ),
+            (
+                WorldStrings::WebsiteDownOrBlockedError,
+                "ThE Websait iz down or itZ blokd",
+            ),
+            (
+                WorldStrings::ConnectionTimeOutError,
+                "I thenk thi coNekshun in TimE outs",
+            ),
+            (
+                WorldStrings::InternetUnknownError,
+                "oh.. not nown eruR okkured",
+            ),
             (WorldStrings::NoInternetError, "yoU don hav enter net"),
-            (WorldStrings::ConnectingToInternet, "aTTEmpteng coneckshun..."),
+            (
+                WorldStrings::ConnectingToInternet,
+                "aTTEmpteng coneckshun...",
+            ),
             (WorldStrings::WordSetting, "Setingz"),
             (WorldStrings::WordMarketplace, "maRKit PLase"),
             (WorldStrings::WordSearch, "Sirch"),
@@ -263,7 +427,10 @@ pub fn build_lang_map(lang_setting: Languages) -> HashMap<WorldStrings, &'static
             (WorldStrings::CloseAppCommand, "关闭 editrs"),
             (WorldStrings::OpenHelpCommand, "打开帮助"),
             (WorldStrings::CorruptedPluginsError, "插件列表可能已损坏"),
-            (WorldStrings::WebsiteDownOrBlockedError, "网站当前可能已关闭或被屏蔽"),
+            (
+                WorldStrings::WebsiteDownOrBlockedError,
+                "网站当前可能已关闭或被屏蔽",
+            ),
             (WorldStrings::ConnectionTimeOutError, "连接超时"),
             (WorldStrings::InternetUnknownError, "发生未知错误"),
             (WorldStrings::NoInternetError, "无网络连接"),
@@ -282,8 +449,14 @@ pub fn build_lang_map(lang_setting: Languages) -> HashMap<WorldStrings, &'static
             (WorldStrings::GotoEditorStartCommand, "移至編輯器開頭"),
             (WorldStrings::CloseAppCommand, "關閉 editrs"),
             (WorldStrings::OpenHelpCommand, "開啟說明"),
-            (WorldStrings::CorruptedPluginsError, "外掛程式清單可能已損壞"),
-            (WorldStrings::WebsiteDownOrBlockedError, "網站目前可能已關閉或遭封鎖"),
+            (
+                WorldStrings::CorruptedPluginsError,
+                "外掛程式清單可能已損壞",
+            ),
+            (
+                WorldStrings::WebsiteDownOrBlockedError,
+                "網站目前可能已關閉或遭封鎖",
+            ),
             (WorldStrings::ConnectionTimeOutError, "連線逾時"),
             (WorldStrings::InternetUnknownError, "發生未知錯誤"),
             (WorldStrings::NoInternetError, "無網路連線"),
@@ -298,16 +471,37 @@ pub fn build_lang_map(lang_setting: Languages) -> HashMap<WorldStrings, &'static
         Languages::Polish => HashMap::from([
             (WorldStrings::OpenTerminalCommand, "Otwórz terminal"),
             (WorldStrings::OpenSettingsCommand, "Otwórz ustawienia"),
-            (WorldStrings::GotoEditorEndCommand, "Przejdź na koniec edytora"),
-            (WorldStrings::GotoEditorStartCommand, "Przejdź na początek edytora"),
+            (
+                WorldStrings::GotoEditorEndCommand,
+                "Przejdź na koniec edytora",
+            ),
+            (
+                WorldStrings::GotoEditorStartCommand,
+                "Przejdź na początek edytora",
+            ),
             (WorldStrings::CloseAppCommand, "Zamknij editrs"),
             (WorldStrings::OpenHelpCommand, "Otwórz pomoc"),
-            (WorldStrings::CorruptedPluginsError, "Lista wtyczek może być uszkodzona"),
-            (WorldStrings::WebsiteDownOrBlockedError, "Strona internetowa może być obecnie wyłączona lub zablokowana"),
-            (WorldStrings::ConnectionTimeOutError, "Przekroczono limit czasu połączenia"),
+            (
+                WorldStrings::CorruptedPluginsError,
+                "Lista wtyczek może być uszkodzona",
+            ),
+            (
+                WorldStrings::WebsiteDownOrBlockedError,
+                "Strona internetowa może być obecnie wyłączona lub zablokowana",
+            ),
+            (
+                WorldStrings::ConnectionTimeOutError,
+                "Przekroczono limit czasu połączenia",
+            ),
             (WorldStrings::InternetUnknownError, "Wystąpił nieznany błąd"),
-            (WorldStrings::NoInternetError, "Brak połączenia z internetem"),
-            (WorldStrings::ConnectingToInternet, "Próba nawiązania połączenia..."),
+            (
+                WorldStrings::NoInternetError,
+                "Brak połączenia z internetem",
+            ),
+            (
+                WorldStrings::ConnectingToInternet,
+                "Próba nawiązania połączenia...",
+            ),
             (WorldStrings::WordSetting, "Ustawienia"),
             (WorldStrings::WordMarketplace, "Rynek"),
             (WorldStrings::WordSearch, "Szukaj"),
@@ -319,13 +513,28 @@ pub fn build_lang_map(lang_setting: Languages) -> HashMap<WorldStrings, &'static
             (WorldStrings::OpenTerminalCommand, "Abrir terminal"),
             (WorldStrings::OpenSettingsCommand, "Abrir configuración"),
             (WorldStrings::GotoEditorEndCommand, "Ir al final del editor"),
-            (WorldStrings::GotoEditorStartCommand, "Ir al inicio del editor"),
+            (
+                WorldStrings::GotoEditorStartCommand,
+                "Ir al inicio del editor",
+            ),
             (WorldStrings::CloseAppCommand, "Cerrar editrs"),
             (WorldStrings::OpenHelpCommand, "Abrir ayuda"),
-            (WorldStrings::CorruptedPluginsError, "La lista de complementos podría estar dañada"),
-            (WorldStrings::WebsiteDownOrBlockedError, "El sitio web puede estar caído o bloqueado en este momento"),
-            (WorldStrings::ConnectionTimeOutError, "Se agotó el tiempo de espera de la conexión"),
-            (WorldStrings::InternetUnknownError, "Ocurrió un error desconocido"),
+            (
+                WorldStrings::CorruptedPluginsError,
+                "La lista de complementos podría estar dañada",
+            ),
+            (
+                WorldStrings::WebsiteDownOrBlockedError,
+                "El sitio web puede estar caído o bloqueado en este momento",
+            ),
+            (
+                WorldStrings::ConnectionTimeOutError,
+                "Se agotó el tiempo de espera de la conexión",
+            ),
+            (
+                WorldStrings::InternetUnknownError,
+                "Ocurrió un error desconocido",
+            ),
             (WorldStrings::NoInternetError, "Sin conexión a internet"),
             (WorldStrings::ConnectingToInternet, "Intentando conectar..."),
             (WorldStrings::WordSetting, "Configuración"),
@@ -338,14 +547,32 @@ pub fn build_lang_map(lang_setting: Languages) -> HashMap<WorldStrings, &'static
         Languages::Russian => HashMap::from([
             (WorldStrings::OpenTerminalCommand, "Открыть терминал"),
             (WorldStrings::OpenSettingsCommand, "Открыть настройки"),
-            (WorldStrings::GotoEditorEndCommand, "Перейти в конец редактора"),
-            (WorldStrings::GotoEditorStartCommand, "Перейти в начало редактора"),
+            (
+                WorldStrings::GotoEditorEndCommand,
+                "Перейти в конец редактора",
+            ),
+            (
+                WorldStrings::GotoEditorStartCommand,
+                "Перейти в начало редактора",
+            ),
             (WorldStrings::CloseAppCommand, "Закрыть editrs"),
             (WorldStrings::OpenHelpCommand, "Открыть справку"),
-            (WorldStrings::CorruptedPluginsError, "Список плагинов возможно поврежден"),
-            (WorldStrings::WebsiteDownOrBlockedError, "Сайт может быть недоступен или заблокирован в данный момент"),
-            (WorldStrings::ConnectionTimeOutError, "Время ожидания соединения истекло"),
-            (WorldStrings::InternetUnknownError, "Произошла неизвестная ошибка"),
+            (
+                WorldStrings::CorruptedPluginsError,
+                "Список плагинов возможно поврежден",
+            ),
+            (
+                WorldStrings::WebsiteDownOrBlockedError,
+                "Сайт может быть недоступен или заблокирован в данный момент",
+            ),
+            (
+                WorldStrings::ConnectionTimeOutError,
+                "Время ожидания соединения истекло",
+            ),
+            (
+                WorldStrings::InternetUnknownError,
+                "Произошла неизвестная ошибка",
+            ),
             (WorldStrings::NoInternetError, "Нет подключения к интернету"),
             (WorldStrings::ConnectingToInternet, "Попытка подключения..."),
             (WorldStrings::WordSetting, "Настройки"),
@@ -358,15 +585,36 @@ pub fn build_lang_map(lang_setting: Languages) -> HashMap<WorldStrings, &'static
         Languages::Ukrainian => HashMap::from([
             (WorldStrings::OpenTerminalCommand, "Відкрити термінал"),
             (WorldStrings::OpenSettingsCommand, "Відкрити налаштування"),
-            (WorldStrings::GotoEditorEndCommand, "Перейти в кінець редактора"),
-            (WorldStrings::GotoEditorStartCommand, "Перейти на початок редактора"),
+            (
+                WorldStrings::GotoEditorEndCommand,
+                "Перейти в кінець редактора",
+            ),
+            (
+                WorldStrings::GotoEditorStartCommand,
+                "Перейти на початок редактора",
+            ),
             (WorldStrings::CloseAppCommand, "Закрити editrs"),
             (WorldStrings::OpenHelpCommand, "Відкрити довідку"),
-            (WorldStrings::CorruptedPluginsError, "Список плагінів можливо пошкоджений"),
-            (WorldStrings::WebsiteDownOrBlockedError, "Сайт може бути недоступний або заблокований у цей момент"),
-            (WorldStrings::ConnectionTimeOutError, "Час очікування з'єднання вичерпано"),
-            (WorldStrings::InternetUnknownError, "Сталася невідома помилка"),
-            (WorldStrings::NoInternetError, "Немає підключення до інтернету"),
+            (
+                WorldStrings::CorruptedPluginsError,
+                "Список плагінів можливо пошкоджений",
+            ),
+            (
+                WorldStrings::WebsiteDownOrBlockedError,
+                "Сайт може бути недоступний або заблокований у цей момент",
+            ),
+            (
+                WorldStrings::ConnectionTimeOutError,
+                "Час очікування з'єднання вичерпано",
+            ),
+            (
+                WorldStrings::InternetUnknownError,
+                "Сталася невідома помилка",
+            ),
+            (
+                WorldStrings::NoInternetError,
+                "Немає підключення до інтернету",
+            ),
             (WorldStrings::ConnectingToInternet, "Спроба підключення..."),
             (WorldStrings::WordSetting, "Налаштування"),
             (WorldStrings::WordMarketplace, "Маркетплейс"),
