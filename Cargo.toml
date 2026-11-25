@@ -7,7 +7,6 @@ authors = ["João Pedro de Sena Santana"]
 description = "A highly customizable TUI text editor written in Rust."
 license = "BSD-2-Clause"
 repository = "https://github.com/joaopssx/editrs"
-homepage = "https://github.com/joaopssx/editrs"
 readme = "README.md"
 keywords = ["editor", "tui", "terminal", "text-editor", "lua"]
 categories = ["text-editors", "command-line-utilities"]

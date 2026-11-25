@@ -655,8 +655,8 @@ impl Editor {
             result.push('\n');
 
             // Middle lines: full content
-            for y in (sy + 1)..ey {
-                result.push_str(&self.lines[y]);
+            for line in &self.lines[(sy + 1)..ey] {
+                result.push_str(line);
                 result.push('\n');
             }
 

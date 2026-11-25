@@ -45,9 +45,10 @@ pub struct KeyCombo {
     pub home_key: bool,
     pub end_key: bool,
     pub print_key: bool,
-    // Here to add padding, allowing us to do this, no matter how many keys we look for
-    #[allow(dead_code)]
-    padding: B4,
+    // Here to add padding, allowing us to do this, no matter how many keys we look for.
+    // `#[skip]` generates no accessors; the bits start (and stay) at zero.
+    #[skip]
+    __: B4,
 }
 
 // Not wired in yet: keybinds are still hardcoded in `input::keymap`.
@@ -218,8 +219,7 @@ fn decode_binding(bind: &'static str) -> Option<(KeyCombo, Option<String>)> {
                 .with_tab(is_tab)
                 .with_esc(is_esc)
                 .with_meta(is_meta)
-                .with_enter(is_enter)
-                .with_padding(0),
+                .with_enter(is_enter),
             Some(key),
         ))
     }
