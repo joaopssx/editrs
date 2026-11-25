@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - editrs now starts on Linux and macOS: the config folder comes from `$XDG_CONFIG_HOME` or `$HOME/.config` instead of `$USERPROFILE`.
+- editrs builds on macOS and FreeBSD again (caps lock is reported as off there).
+- The Linux build, broken by a missing import in 0.1.0.
 
 ## [0.1.0] - 2026-11-25
 

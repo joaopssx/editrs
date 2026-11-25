@@ -12,9 +12,6 @@ jobs:
   test:
     name: ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    # macOS does not build yet: src/input/caps_lock.rs has no macOS implementation.
-    # Remove this once it does.
-    continue-on-error: ${{ matrix.os == 'macos-latest' }}
     strategy:
       fail-fast: false
       matrix:

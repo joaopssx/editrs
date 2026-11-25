@@ -101,9 +101,9 @@ A `flake.nix` is included (`nix build`, `nix run`), but it is **not validated**.
 | Platform | Status |
 |---|---|
 | Windows x86_64 | Builds and runs (tested) |
-| Linux x86_64 | Builds in CI |
-| macOS | Does not build yet (caps lock detection is not implemented) |
-| FreeBSD | Does not build yet (same reason) |
+| Linux x86_64 | Builds and passes tests (CI, WSL) |
+| macOS | Builds in CI; not tested by hand; no caps lock detection |
+| FreeBSD | Not tested; no caps lock detection |
 
 ## Configuration
 

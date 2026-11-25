@@ -133,7 +133,7 @@ Lua (details in `LUA_DOCS.md`):
 
 Bugs noted, not fixed in 0.1.0 (0.1.0 is identity only):
 
-- `input/caps_lock.rs` has `compile_error!` for macOS, FreeBSD, OpenBSD and NetBSD, so those targets do not build. `App::new` also hits `unreachable!` on other OSes.
+- `input/caps_lock.rs` only detects caps lock on Linux and Windows; elsewhere it reports "off". `App::new` hits `unreachable!` on OSes other than Windows, macOS, Linux and FreeBSD.
 - `-v` prints the version but does not exit (`--version` does).
 - A path argument that does not exist panics (`canonicalize().unwrap()`).
 - Lua API bugs: inverted bounds in `GetCharAt` and `GetStrAt`, byte indexing in `GetCharAtCursor` (panics on non-ASCII), swapped x/y in `InsertStrAtCursor`, `editor.insert.str` ignores its position, `editor.insert.line` replaces instead of inserting, responders are reused across calls without being reset.

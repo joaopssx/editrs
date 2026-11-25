@@ -92,9 +92,9 @@ Existe um `flake.nix` (`nix build`, `nix run`), mas ele **não foi validado**. O
 | Plataforma | Situação |
 |---|---|
 | Windows x86_64 | Compila e roda (testado) |
-| Linux x86_64 | Compila no CI |
-| macOS | Ainda não compila (detecção de Caps Lock não implementada) |
-| FreeBSD | Ainda não compila (mesmo motivo) |
+| Linux x86_64 | Compila e passa nos testes (CI, WSL) |
+| macOS | Compila no CI; não testado à mão; sem detecção de Caps Lock |
+| FreeBSD | Não testado; sem detecção de Caps Lock |
 
 ## Configuração
 
