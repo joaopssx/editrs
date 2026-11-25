@@ -1,0 +1,27 @@
+name: Benchmark
+
+on:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  startup:
+    name: Startup time
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install hyperfine
+        run: sudo apt-get update && sudo apt-get install -y hyperfine
+
+      - name: Run startup benchmark
+        run: scripts/bench-startup.sh "" target/bench-startup.md
+
+      - name: Add results to the job summary
+        run: cat target/bench-startup.md >> "$GITHUB_STEP_SUMMARY"
