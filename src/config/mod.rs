@@ -3,8 +3,43 @@ pub mod langs;
 
 use indexmap::IndexMap;
 use serde_json::{Value, json};
+use std::ffi::OsString;
+use std::path::PathBuf;
 
 pub type Config = IndexMap<String, Value>;
+
+/// Folder that holds `config.jsonc` and `plugins/`.
+///
+/// Windows: `%APPDATA%\editrs`. Elsewhere: `$XDG_CONFIG_HOME/editrs`, or
+/// `$HOME/.config/editrs` when `XDG_CONFIG_HOME` is unset or not absolute.
+/// Returns `None` when the needed environment variables are missing.
+pub fn config_dir() -> Option<PathBuf> {
+    resolve_config_dir(
+        cfg!(windows),
+        std::env::var_os("APPDATA"),
+        std::env::var_os("XDG_CONFIG_HOME"),
+        std::env::var_os("HOME"),
+    )
+}
+
+fn resolve_config_dir(
+    windows: bool,
+    appdata: Option<OsString>,
+    xdg_config_home: Option<OsString>,
+    home: Option<OsString>,
+) -> Option<PathBuf> {
+    let non_empty = |v: Option<OsString>| v.filter(|s| !s.is_empty()).map(PathBuf::from);
+
+    let base = if windows {
+        non_empty(appdata)?
+    } else {
+        match non_empty(xdg_config_home).filter(|p| p.is_absolute()) {
+            Some(xdg) => xdg,
+            None => non_empty(home)?.join(".config"),
+        }
+    };
+    Some(base.join(crate::APP_NAME))
+}
 
 pub fn default() -> Config {
     let default_json = json!({
@@ -51,4 +86,41 @@ pub fn default() -> Config {
         .clone()
         .into_iter()
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::resolve_config_dir;
+    use std::path::PathBuf;
+
+    fn os(s: &str) -> Option<std::ffi::OsString> {
+        Some(s.into())
+    }
+
+    #[test]
+    fn windows_uses_appdata() {
+        let dir = resolve_config_dir(true, os(r"C:\Users\me\AppData\Roaming"), None, None);
+        assert_eq!(
+            dir,
+            Some(PathBuf::from(r"C:\Users\me\AppData\Roaming").join("editrs"))
+        );
+        assert_eq!(resolve_config_dir(true, None, None, os("/home/me")), None);
+    }
+
+    // "/home/me/cfg" is only an absolute path on Unix.
+    #[cfg(unix)]
+    #[test]
+    fn unix_prefers_absolute_xdg_config_home() {
+        let dir = resolve_config_dir(false, None, os("/home/me/cfg"), os("/home/me"));
+        assert_eq!(dir, Some(PathBuf::from("/home/me/cfg/editrs")));
+    }
+
+    #[test]
+    fn unix_falls_back_to_home_dot_config() {
+        for xdg in [None, os(""), os("relative/dir")] {
+            let dir = resolve_config_dir(false, None, xdg, os("/home/me"));
+            assert_eq!(dir, Some(PathBuf::from("/home/me/.config/editrs")));
+        }
+        assert_eq!(resolve_config_dir(false, None, None, None), None);
+    }
 }

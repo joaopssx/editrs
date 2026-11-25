@@ -124,16 +124,8 @@ pub enum WorldStrings {
 }
 
 impl App {
-    pub fn new(plugin_rx: Receiver<PluginAction>) -> Self {
-        let path = if cfg!(windows) {
-            PathBuf::from(std::env::var("APPDATA").unwrap()).join(crate::APP_NAME)
-        } else {
-            PathBuf::from(std::env::var("USERPROFILE").unwrap())
-                .join(".config")
-                .join(crate::APP_NAME)
-        };
-
-        let user_lang = std::fs::read_to_string(path.join("config.jsonc"))
+    pub fn new(plugin_rx: Receiver<PluginAction>, config_dir: &Path) -> Self {
+        let user_lang = std::fs::read_to_string(config_dir.join("config.jsonc"))
             .map(|contents| {
                 // grab the first line and check for a shebang
                 contents

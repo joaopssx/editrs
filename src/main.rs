@@ -195,15 +195,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     reqwest::Client::new();
 
-    let path = if cfg!(windows) {
-        PathBuf::from(env::var("APPDATA")?).join(APP_NAME)
-    } else {
-        // This is a standard config location, and we can store plugins here too,
-        // so we can just delete our config folder and our application on uninstall
-        PathBuf::from(env::var("USERPROFILE")?)
-            .join(".config")
-            .join(APP_NAME)
-    };
+    // Config and plugins live in one folder, so uninstalling means deleting it.
+    let path = config::config_dir().ok_or(
+        "could not find the config folder: set APPDATA on Windows, or HOME (or XDG_CONFIG_HOME) elsewhere",
+    )?;
 
     let (plugin_tx, plugin_rx) = crossbeam_channel::unbounded();
 
@@ -244,7 +239,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     execute!(std::io::stdout(), EnableFocusChange)?;
 
     // Create app and run it
-    let mut app: App = App::new(plugin_rx);
+    let mut app: App = App::new(plugin_rx, &path);
 
     let mut terminal = ratatui::init();
 
