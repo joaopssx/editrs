@@ -41,13 +41,9 @@ Versions are the ones resolved in `Cargo.lock`.
 | aho-corasick | 1.1.5 | Unlicense OR MIT | Project search | yes |
 | arboard | 3.7.0 | MIT OR Apache-2.0 | Clipboard (Linux, Windows, macOS) | yes |
 | arc-swap | 1.9.5 | MIT OR Apache-2.0 | Highlight cache swapping | yes |
-| bumpalo | 3.20.4 | MIT OR Apache-2.0 | Arena allocation | **no** |
 | compact_str | 0.9.1 | MIT | Small-string optimized lines | yes |
 | crossbeam-channel | 0.5.17 | MIT OR Apache-2.0 | Plugin to app messages | yes |
 | crossterm | 0.29.0 | MIT | Terminal input | yes |
-| evdev | 0.13.2 | Apache-2.0 OR MIT | Linux input (caps lock) | **no** |
-| git2 | 0.20.4 | MIT OR Apache-2.0 | Git (BSDs only) | **no** |
-| gix | 0.83.0 | MIT OR Apache-2.0 | Git (Linux, Windows, macOS) | **no** (git CLI is used) |
 | glob | 0.3.4 | MIT OR Apache-2.0 | Caps lock LED lookup (Linux) | yes |
 | hashbrown | 0.17.2 | MIT OR Apache-2.0 | Hash maps | yes |
 | ignore | 0.4.35 | Unlicense OR MIT | `.gitignore`-aware file walking | yes |
@@ -57,23 +53,21 @@ Versions are the ones resolved in `Cargo.lock`.
 | modular-bitfield | 0.13.1 | MIT OR Apache-2.0 | Key combo bitfield | yes (dead code) |
 | online | 4.0.2 | MIT | Connectivity check | yes |
 | parking_lot | 0.12.5 | MIT OR Apache-2.0 | Mutex, RwLock, Condvar | yes |
-| pgp | 0.19.0 | MIT OR Apache-2.0 | Marketplace signature verification | **no** |
 | portable-pty | 0.9.0 | MIT | Built-in terminal | yes |
-| pulldown-cmark | 0.13.6 | MIT | Markdown parsing | **no** |
 | ratatui | 0.30.2 | MIT | Rendering | yes |
 | rayon | 1.12.0 | MIT OR Apache-2.0 | Thread pool (plugins, marketplace, search) | yes |
 | reqwest | 0.13.5 | MIT OR Apache-2.0 | Marketplace HTTP | yes |
 | serde / serde_json | 1.0.229 / 1.0.154 | MIT OR Apache-2.0 | Config values, Lua bridge | yes |
-| smol_str | 0.2.2 | MIT OR Apache-2.0 | Small strings | **no** |
 | syntect | 5.3.0 | MIT | Syntax highlighting | yes |
-| termimad | 0.34.1 | MIT | Markdown rendering | only mentioned, not called |
 | tokio | 1.54.1 | MIT | Async runtime | **no** direct use |
 | triomphe | 0.1.17 | MIT OR Apache-2.0 | `Arc` without weak counts | yes |
-| vt100 | 0.16.2 | MIT | Terminal emulation | **no** (own parser) |
 | windows-sys | 0.61.2 | MIT OR Apache-2.0 | Caps lock (Windows) | yes |
 | ureq, tar, xz2 (build) | 3.5.2, 0.4.46, 0.1.7 | MIT OR Apache-2.0 | Font download in `build.rs` | yes |
 
-Removing the unused crates (especially `gix`, `pgp`, `tokio`, `git2`) should cut build time noticeably.
+Dependency decisions (0.2.0, idea 016):
+
+- Removed because nothing in the code used them: `bumpalo`, `evdev`, `git2`, `gix`, `pgp`, `pulldown-cmark`, `smol_str`, `termimad`, `vt100`. Git features use the `git` command-line tool. `Cargo.lock` went from 611 to 390 packages, the Windows dependency tree from 588 to 270 crates, and a clean release build on Windows from 1 min 21 s to 1 min 06 s (single run each, not a controlled benchmark). The binary size barely changed (6,771,712 -> 6,733,312 bytes) because unused crates were not linked anyway.
+- Kept but worth revisiting: `tokio` is not used directly (only through `online`'s `tokio` feature), and `reqwest`, `tokio` and `online` exist only for the marketplace, which is disabled until it has a server. Making them an optional Cargo feature (idea 017) would cut most of the remaining build time.
 
 Third-party assets: the 0xProto Nerd Font license (SIL OFL 1.1) is downloaded at build time and embedded; `--license=ofl|all` prints it. Only the license text is embedded today (`FONT_BYTES` in `font.rs` is generated but never included). The MIT/Apache dependencies require their notices in binary distributions; nothing collects them yet (consider `cargo about` or `cargo-bundle-licenses` before shipping release binaries).
 

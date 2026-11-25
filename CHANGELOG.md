@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Release builds abort on panic and strip symbols: the Windows binary is about 16% smaller.
+- Nine unused dependencies were removed (611 -> 390 packages in `Cargo.lock`), so builds are faster.
 
 ### Security
 
