@@ -1,28 +1,62 @@
 use crate::plugin::action::PluginAction;
-use mlua::{Lua, Result, StdLib};
+use crossbeam_channel::Sender;
+use mlua::{Lua, Result};
 use rayon;
 use std::{fs, path::PathBuf};
+
+/// Reads a plugin's `config` file as its JSON permission policy.
+///
+/// An empty file means "no permissions". A file that is not a JSON object is
+/// reported to the debug console and also treated as "no permissions".
+fn parse_policy(text: &str, tx: &Sender<PluginAction>) -> serde_json::Value {
+    let empty = || serde_json::Value::Object(Default::default());
+    if text.trim().is_empty() {
+        return empty();
+    }
+    match serde_json::from_str::<serde_json::Value>(text) {
+        Ok(policy) if policy.is_object() => policy,
+        Ok(_) | Err(_) => {
+            let _ = tx.send(PluginAction::DebugLog {
+                message: String::from(
+                    "Plugin config is not a JSON object; running with no permissions",
+                ),
+            });
+            empty()
+        }
+    }
+}
+
+/// Creates a Lua state with the plugin sandbox and editor API applied.
+fn build_runtime(tx: &Sender<PluginAction>, policy: &serde_json::Value) -> Result<Lua> {
+    // `Lua::new` already loads the safe standard libraries. They must not be
+    // loaded again after `apply_restrictions`, or the removed globals return.
+    let lua = Lua::new();
+    crate::plugin::policy::apply_restrictions(&lua, tx.clone(), policy)?;
+    crate::plugin::global_set::apply_globals(&lua, tx.clone())?;
+    Ok(lua)
+}
 
 fn spawn_lua_worker(
     plugin_path: PathBuf,
     action_tx: crossbeam_channel::Sender<PluginAction>,
 ) -> Result<()> {
     let script = fs::read_to_string(PathBuf::from(&plugin_path).join("src").join("main.lua"))?;
-    let plugin_policy = serde_json::Value::from(fs::read_to_string(
-        PathBuf::from(&plugin_path).join("config"),
-    )?);
+    let plugin_policy = parse_policy(
+        &fs::read_to_string(PathBuf::from(&plugin_path).join("config"))?,
+        &action_tx,
+    );
     if !script.is_empty() {
         rayon::spawn(move || {
             // Since an empty script is wasted work, we just do nothing with it
-            let lua = Lua::new();
-
-            crate::plugin::policy::apply_restrictions(&lua, action_tx.clone(), &plugin_policy)
-                .expect("Something went wrong with applying resrtictions to plugins.");
-
-            lua.load_std_libs(StdLib::ALL_SAFE)
-                .expect("Critical: Could not load Lua libs");
-
-            let _ = crate::plugin::global_set::apply_globals(&lua, action_tx.clone());
+            let lua = match build_runtime(&action_tx, &plugin_policy) {
+                Ok(lua) => lua,
+                Err(e) => {
+                    let _ = action_tx.send(PluginAction::DebugLog {
+                        message: format!("Plugin sandbox error: {}", e),
+                    });
+                    return;
+                }
+            };
 
             // Clean up, to free anything leftover from setting the security policy,
             // Such as the following scenario...
@@ -99,4 +133,49 @@ pub fn load_plugins(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{build_runtime, parse_policy};
+
+    #[test]
+    fn policy_is_parsed_as_json() {
+        let (tx, rx) = crossbeam_channel::unbounded();
+        let policy = parse_policy(r#"{ "make threads": true }"#, &tx);
+        assert_eq!(policy["make threads"], serde_json::json!(true));
+        assert!(rx.try_recv().is_err(), "valid policy logs nothing");
+    }
+
+    #[test]
+    fn empty_or_invalid_policy_grants_nothing() {
+        let (tx, rx) = crossbeam_channel::unbounded();
+        assert_eq!(
+            parse_policy(
+                "  
+", &tx
+            ),
+            serde_json::json!({})
+        );
+        assert!(rx.try_recv().is_err());
+        for bad in ["not json", "[1, 2]", "true"] {
+            assert_eq!(parse_policy(bad, &tx), serde_json::json!({}));
+            assert!(rx.try_recv().is_ok(), "{bad} should be reported");
+        }
+    }
+
+    #[test]
+    fn runtime_keeps_restrictions_and_adds_editor_api() {
+        let (tx, _rx) = crossbeam_channel::unbounded();
+        let lua = build_runtime(&tx, &serde_json::json!({})).expect("runtime builds");
+        let check = |expr: &str| -> bool {
+            lua.load(format!("return {expr} == nil"))
+                .eval()
+                .expect("expression runs")
+        };
+        assert!(check("io.open"), "io.open must stay removed");
+        assert!(check("package"), "package must stay removed");
+        assert!(!check("editor"), "editor API is available");
+        assert!(!check("open"), "open() replacement is available");
+    }
 }
