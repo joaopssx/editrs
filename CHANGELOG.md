@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `scripts/bench-startup.sh` to measure startup time with hyperfine, also run on pull requests.
+
 ### Security
 
 - The Lua plugin sandbox now applies the plugin's permissions. Before, file and process functions (`io.open`, `os.execute` and others) stayed available to every plugin.
