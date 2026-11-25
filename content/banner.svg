@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="200" viewBox="0 0 800 200" role="img" aria-label="editrs">
+  <rect width="800" height="200" rx="12" fill="#1e1e1e"/>
+  <text x="400" y="112" text-anchor="middle" fill="#e6e6e6" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="72" font-weight="700">editrs<tspan fill="#4ec9b0">_</tspan></text>
+  <text x="400" y="156" text-anchor="middle" fill="#9a9a9a" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="20">a customizable TUI text editor in Rust</text>
+</svg>

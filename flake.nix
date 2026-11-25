@@ -1,5 +1,5 @@
 {
-  description = "Sprig - A TUI text editor";
+  description = "editrs - A highly customizable TUI text editor written in Rust";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -36,8 +36,9 @@
           ];
 
           meta = with pkgs.lib; {
-            description = cargoToml.package.description or "Rust application";
-            license = licenses.mit; # change if needed
+            description = cargoToml.package.description;
+            homepage = cargoToml.package.homepage;
+            license = licenses.bsd2;
             platforms = platforms.unix;
             mainProgram = cargoToml.package.name;
           };
@@ -60,7 +61,7 @@
       })
     // {
       overlays.default = final: prev: {
-        sprig = self.packages.${final.system}.default;
+        editrs = self.packages.${final.system}.default;
       };
     };
 }
