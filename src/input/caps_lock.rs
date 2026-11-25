@@ -5,7 +5,7 @@ pub fn is_caps_lock_on() -> bool {
 
     if let Ok(paths) = glob(capslock_led_file) {
         for entry in paths.flatten() {
-            if let Ok(content) = fs::read_to_string(&entry) {
+            if let Ok(content) = std::fs::read_to_string(&entry) {
                 // '0' means off, '1' (or higher) means on
                 if content.trim() != "0" {
                     return true;
@@ -27,22 +27,10 @@ pub fn is_caps_lock_on() -> bool {
     }
 }
 
-#[cfg(target_os = "freebsd")]
+/// No caps lock detection on other systems (macOS, the BSDs) yet: report it
+/// as off. The only effect is in `keymap::map_key`, where Ctrl+Shift+letter
+/// is then always read as the uppercase letter.
+#[cfg(not(any(target_os = "linux", target_os = "windows")))]
 pub fn is_caps_lock_on() -> bool {
-    compile_error!("Caps lock detection for FreeBSD is not implemented yet.")
-}
-
-#[cfg(target_os = "openbsd")]
-pub fn is_caps_lock_on() -> bool {
-    compile_error!("Caps lock detection for OpenBSD is not implemented yet.")
-}
-
-#[cfg(target_os = "netbsd")]
-pub fn is_caps_lock_on() -> bool {
-    compile_error!("Caps lock detection for NetBSD is not implemented yet.")
-}
-
-#[cfg(target_os = "macos")]
-pub fn is_caps_lock_on() -> bool {
-    compile_error!("Caps lock detection for MacOS is not implemented yet.")
+    false
 }
