@@ -72,5 +72,10 @@ xz2  = "0.1.7"
 [profile.release]
 lto = "fat"
 codegen-units = 1
+# Background work runs on rayon, which already aborts the process on panic,
+# so unwinding buys nothing here. The terminal is still restored by the
+# panic hook that ratatui::init installs.
+panic = "abort"
+strip = true
 
 [profile.release.package."*"]
