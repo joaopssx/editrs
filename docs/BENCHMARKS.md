@@ -32,3 +32,14 @@ The CI runs this script on every pull request (`.github/workflows/bench.yml`) an
 |---|---|---|---|---|
 | 2026-11-25 | 0.1.0 upstream tree, Windows, `Measure-Command` | Ryzen 9 7950X | 9.0 ms (median) | 9,276,416 bytes |
 | 2026-11-25 | 0.2.0-dev (`perf/001`), Linux (WSL2), hyperfine 2.0, 50 runs | Ryzen 9 7950X | 1.1 ms ± 0.1 ms | 10,694,456 bytes |
+
+## Release profile (idea 002)
+
+`panic = "abort"` and `strip = true` were added to `[profile.release]` (`lto = "fat"` and `codegen-units = 1` were already set). Measured on Windows, Ryzen 9 7950X, Rust 1.99.1, 40 interleaved runs of `--version` with `Measure-Command`:
+
+| Build | Release binary | Startup median | Startup min |
+|---|---|---|---|
+| Before | 8,095,232 bytes | 8.57 ms | 7.90 ms |
+| After | 6,771,712 bytes (-16.4%) | 8.58 ms | 7.95 ms |
+
+Startup time is dominated by process creation, so it does not change; the gain is binary size.
